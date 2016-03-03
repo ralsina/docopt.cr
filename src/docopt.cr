@@ -19,7 +19,6 @@ module Docopt
     @error : (DocoptExit.class | DocoptLanguageError.class)
 
     def initialize(@error = DocoptExit : (DocoptExit.class | DocoptLanguageError.class))
-      puts @error.class
       super()
     end
 
