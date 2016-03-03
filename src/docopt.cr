@@ -647,7 +647,7 @@ module Docopt
             dic[name] = a.value
           end
         end
-        puts dic
+        # puts dic
         return dic
       end
       raise DocoptExit.new
