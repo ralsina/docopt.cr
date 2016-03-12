@@ -1,6 +1,6 @@
 require "./spec_helper"
 
-describe Docopt do
+describe "Docopt" do
   # TODO: Write tests
 
   it "works" do
@@ -22,8 +22,19 @@ Options:
   --moored      Moored (anchored) mine.
   --drifting    Drifting mine.
 DOC
-    std = {"ship" => true, "new" => false, "<name>" => "A", "move" => true, "<x>" => "a", "<y>" => "b", "--speed" => "3", "shoot" => false, "mine" => false, "set" => false, "remove" => false, "--moored" => nil, "--drifting" => nil, "-h" => nil, "--help" => false, "--version" => nil}
-    # ans = Docopt.docopt(doc, argv = ["ship", "A", "mov", "a", "b", "--speed=3"])
-    # ans.shoud eq(std)
+    std = {"ship" => true, "new" => false, "<name>" => ["A"], "move" => true, "<x>" => "a", "<y>" => "b", "--speed" => "3", "shoot" => false, "mine" => false, "set" => false, "remove" => false, "--moored" => nil, "--drifting" => nil, "-h" => nil, "--help" => false, "--version" => nil}
+    ans = Docopt.docopt(doc, argv = ["ship", "A", "move", "a", "b", "--speed=3"])
+    ans["<name>"].should eq(std["<name>"])
+  end
+  it "one or more" do
+    doc = <<-DOC
+test
+Usage:
+    naval [--files=files...]
+DOC
+    ans = Docopt.docopt(doc, argv = ["--files=a.txt", "--files=b.txt"])
+    farr = ans["--files"] as Array(String)
+    "a.txt".should eq(farr[0])
+    "b.txt".should eq(farr[1])
   end
 end
