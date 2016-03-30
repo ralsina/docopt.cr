@@ -18,7 +18,7 @@ module Docopt
     property :error
     @error : (DocoptExit.class | DocoptLanguageError.class)
 
-    def initialize(@error = DocoptExit : (DocoptExit.class | DocoptLanguageError.class))
+    def initialize(@error : (DocoptExit.class | DocoptLanguageError.class) = DocoptExit)
       super()
     end
 
@@ -147,7 +147,7 @@ module Docopt
 
     abstract def flat(*types)
 
-    abstract def match(left : Array(Pattern), collected = nil : (Nil | Array(Pattern))) : Tuple(Bool, Array(Pattern), Array(Pattern))
+    abstract def match(left : Array(Pattern), collected : (Nil | Array(Pattern)) = nil) : Tuple(Bool, Array(Pattern), Array(Pattern))
     #  return false, left, ([] of Pattern)
     # end
   end
@@ -171,7 +171,7 @@ module Docopt
       return [] of Pattern
     end
 
-    def match(left : Array(Pattern), collected = nil : (Nil | Array(Pattern))) : Tuple(Bool, Array(Pattern), Array(Pattern))
+    def match(left : Array(Pattern), collected : (Nil | Array(Pattern)) = nil) : Tuple(Bool, Array(Pattern), Array(Pattern))
       # def match(left, collected = nil)
       # @TODO
       collected = [] of Pattern if collected.nil?
@@ -241,7 +241,7 @@ module Docopt
   end
 
   class Required < BranchPattern
-    def match(left : Array(Pattern), collected = nil : (Nil | Array(Pattern))) : Tuple(Bool, Array(Pattern), Array(Pattern))
+    def match(left : Array(Pattern), collected : (Nil | Array(Pattern)) = nil) : Tuple(Bool, Array(Pattern), Array(Pattern))
       # def match(left, collected = nil)
       collected = [] of Pattern if collected.nil?
       l = left
@@ -258,7 +258,7 @@ module Docopt
   end
 
   class Optional < BranchPattern
-    def match(left : Array(Pattern), collected = nil : (Nil | Array(Pattern))) : Tuple(Bool, Array(Pattern), Array(Pattern))
+    def match(left : Array(Pattern), collected : (Nil | Array(Pattern)) = nil) : Tuple(Bool, Array(Pattern), Array(Pattern))
       # def match(left, collected = nil)
       collected = [] of Pattern if collected.nil?
       ch = @children as Array(Pattern)
@@ -312,7 +312,7 @@ module Docopt
   end
 
   class OneOrMore < BranchPattern
-    def match(left : Array(Pattern), collected = nil : (Nil | Array(Pattern))) : Tuple(Bool, Array(Pattern), Array(Pattern))
+    def match(left : Array(Pattern), collected : (Nil | Array(Pattern)) = nil) : Tuple(Bool, Array(Pattern), Array(Pattern))
       # def match(left, collected = nil)
       ch = @children as Array(Pattern)
       raise "#{ch}.size != 1" if ch.size != 1
@@ -338,7 +338,7 @@ module Docopt
   end
 
   class Either < BranchPattern
-    def match(left : Array(Pattern), collected = nil : (Nil | Array(Pattern))) : Tuple(Bool, Array(Pattern), Array(Pattern))
+    def match(left : Array(Pattern), collected : (Nil | Array(Pattern)) = nil) : Tuple(Bool, Array(Pattern), Array(Pattern))
       # def match(left, collected = nil)
       collected = [] of Pattern if collected.nil?
       outcomes = [] of Tuple(Bool, Array(Pattern), Array(Pattern))
