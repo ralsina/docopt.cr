@@ -60,4 +60,10 @@ describe "Docopt" do
     ans = process.call(["-h"])
     ans["--help"].should be_true
   end
+
+  it("should raise exception if not match") do
+    expect_raises(Exception) do
+      Docopt.docopt("", ["ship"], help: false, exit: false)
+    end
+  end
 end
