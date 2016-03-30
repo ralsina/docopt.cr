@@ -375,7 +375,7 @@ module Docopt
 
     def self.parse(option_description)
       short, long, argcount, value = nil, nil, 0, false
-      options, description = option_description.strip.split(limit = 2)
+      options, description = option_description.strip.split("  ", limit = 2)
       options = options.gsub(',', ' ').gsub('=', ' ')
       options.split.each do |tok|
         if tok.starts_with? "--"
@@ -615,54 +615,49 @@ module Docopt
     end
   end
 
-  def self.docopt(doc, argv = nil, help = true, version = nil, options_first = false) : Hash(String, (Nil | String | Int32 | Bool | Array(String)))
-    begin
-      argv = argv.nil? ? ARGV : argv
-      usage_sections = parse_section("usage:", doc)
-      if usage_sections.size == 0
-        raise DocoptLanguageError.new "\"usage\": (case-insensitive) not found."
-      end
-      if usage_sections.size > 1
-        raise DocoptLanguageError.new "More than one \"usage:\" (case-insensitive)."
-      end
-      usage = usage_sections[0]
-      DocoptExit.usage = usage
-      options = parse_defaults(doc)
-      pattern = parse_pattern(formal_usage(usage), options)
-      argv = parse_argv(Tokens.from_array(argv as Array(String)), options, options_first)
-      pattern_options = pattern.flat Option
-      pattern.flat(AnyOptions).each do |options_shortcut|
-        options_shortcut_ = options_shortcut as BranchPattern
-        options_shortcut_.children = (options - pattern_options).uniq
-      end
-      extras(help, version, argv, doc)
-      matched, left, collected = pattern.fix.match(argv)
-      if matched && left.size == 0
-        dic = {} of String => (Nil | String | Int32 | Bool | Array(String))
-        (pattern.flat + collected).each do |a|
-          if a.is_a? LeafPattern
-            name = a.name as String
-            dic[name] = a.value
-          end
+  def self.docopt(doc, argv = nil, help = true, version = nil, options_first = false, exit = true) : Hash(String, (Nil | String | Int32 | Bool | Array(String)))
+    argv = argv.nil? ? ARGV : argv
+    usage_sections = parse_section("usage:", doc)
+    if usage_sections.size == 0
+      raise DocoptLanguageError.new "\"usage\": (case-insensitive) not found."
+    end
+    if usage_sections.size > 1
+      raise DocoptLanguageError.new "More than one \"usage:\" (case-insensitive)."
+    end
+    usage = usage_sections[0]
+    DocoptExit.usage = usage
+    options = parse_defaults(doc)
+    pattern = parse_pattern(formal_usage(usage), options)
+    argv = parse_argv(Tokens.from_array(argv as Array(String)), options, options_first)
+    pattern_options = pattern.flat Option
+    pattern.flat(AnyOptions).each do |options_shortcut|
+      options_shortcut_ = options_shortcut as BranchPattern
+      options_shortcut_.children = (options - pattern_options).uniq
+    end
+    extras(help, version, argv, doc)
+    matched, left, collected = pattern.fix.match(argv)
+    if matched && left.size == 0
+      dic = {} of String => (Nil | String | Int32 | Bool | Array(String))
+      (pattern.flat + collected).each do |a|
+        if a.is_a? LeafPattern
+          name = a.name as String
+          dic[name] = a.value
         end
-        # puts dic
-        return dic
       end
-      raise DocoptExit.new
-    rescue ex : DocoptExit
+      # puts dic
+      return dic
+    end
+    raise DocoptExit.new
+  rescue ex
+    if (exit)
       msg = ex.message
       if msg.is_a?(String) && msg.size > 0
         puts msg
       end
       puts DocoptExit.usage
-      exit
-    rescue ex : Exception
-      msg = ex.message
-      if msg.is_a?(String) && msg.size > 0
-        puts msg
-      end
-      puts DocoptExit.usage
-      exit
+      Process.exit
+    else
+      raise ex
     end
   end
 end
