@@ -616,7 +616,7 @@ module Docopt
   end
 
   def self.docopt(doc, argv = nil, help = true, version = nil, options_first = false, exit = true) : Hash(String, (Nil | String | Int32 | Bool | Array(String)))
-    argv = argv.nil? ? ARGV : argv
+    argv = ARGV if argv.nil?
     usage_sections = parse_section("usage:", doc)
     if usage_sections.size == 0
       raise DocoptLanguageError.new "\"usage\": (case-insensitive) not found."
