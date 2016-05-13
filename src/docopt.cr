@@ -1,8 +1,11 @@
 module Docopt
-  class DocoptLanguageError < Exception
+  class DocoptEception < Exception
   end
 
-  class DocoptExit < Exception
+  class DocoptLanguageError < DocoptEception
+  end
+
+  class DocoptExit < DocoptEception
     @@usage = ""
 
     def self.usage=(u : String)
@@ -50,6 +53,10 @@ module Docopt
 
   abstract class Pattern
     getter :children
+
+    def initialize
+      @children = nil as (Array(Pattern) | Nil)
+    end
 
     def ==(other : Pattern) : Bool
       return to_s == other.to_s
@@ -156,8 +163,8 @@ module Docopt
     getter :name
     property :value
 
-    def initialize(@name, @value = nil)
-      @children = nil
+    def initialize(@name : (String | Nil), @value : (Nil | String | Int32 | Bool | Array(String)) = nil)
+      @children = nil as (Array(Pattern) | Nil)
     end
 
     def to_s
@@ -216,7 +223,7 @@ module Docopt
   abstract class BranchPattern < Pattern
     property :children
 
-    def initialize(children)
+    def initialize(children : Array(Pattern))
       @children = children
     end
 
@@ -295,6 +302,7 @@ module Docopt
 
   class Command < Argument
     def initialize(@name, @value = false)
+      super
     end
 
     def single_match(left)
@@ -360,7 +368,7 @@ module Docopt
     getter :short, :long, :argcount
     property :value
 
-    def initialize(@short = nil, @long = nil, @argcount = 0, value = false)
+    def initialize(@short : (String | Nil) = nil, @long : (String | Nil) = nil, @argcount = 0, value = false)
       raise "argcount not in [0,1]" if argcount != 0 && argcount != 1
       value = (value == false && argcount > 0) ? nil : value
       if !long.nil?
@@ -632,7 +640,7 @@ module Docopt
     pattern_options = pattern.flat Option
     pattern.flat(AnyOptions).each do |options_shortcut|
       options_shortcut_ = options_shortcut as BranchPattern
-      options_shortcut_.children = (options - pattern_options).uniq
+      options_shortcut_.children = (options - pattern_options).uniq.map { |x| x as Pattern }
     end
     extras(help, version, argv, doc)
     matched, left, collected = pattern.fix.match(argv)
