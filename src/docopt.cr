@@ -102,7 +102,7 @@ module Docopt
       (either.children.as Array(Pattern)).map { |c| c.children.as Array(Pattern) }.each do |case_|
         case_.select { |c| case_.count(c) > 1 }.map do |e|
           if e.class == Argument || e.class == Option && (e.as Option).argcount > 0
-            e_ = (e.as (Argument | Option))
+            e_ = (e.as(Argument | Option))
             if e_.value.nil?
               e_.value = [] of String
             elsif !e_.value.is_a? Array
@@ -110,7 +110,7 @@ module Docopt
             end
           end
           if e.class == Command || e.class == Option && (e.as Option).argcount == 0
-            (e.as (Command | Option)).value = 0
+            (e.as(Command | Option)).value = 0
           end
         end
       end
@@ -162,9 +162,11 @@ module Docopt
   abstract class LeafPattern < Pattern
     getter :name
     property :value
+    @name : (String | Nil)
+    @value : (Nil | String | Int32 | Bool | Array(String))
 
-    def initialize(@name : (String | Nil), @value : (Nil | String | Int32 | Bool | Array(String)) = nil)
-      @children = nil.as (Array(Pattern) | Nil)
+    def initialize(@name, @value = nil)
+      @children = nil.as(Array(Pattern) | Nil)
     end
 
     def to_s
@@ -209,7 +211,7 @@ module Docopt
             return true, left_, collected_ + ([match_.as Pattern])
           end
           value = (same_name[0].as LeafPattern).value.as Array(String)
-          value += increment
+          value.concat increment
           (same_name[0].as LeafPattern).value = value
           return true, left_, collected_
         end
@@ -283,7 +285,7 @@ module Docopt
     def single_match(left)
       left.each_with_index do |pat, n|
         if pat.is_a? Argument
-          return n, Argument.new(@name, value: pat.value.as((Nil | String | Int32 | Bool | Array(String))))
+          return n, Argument.new(@name, pat.value)
         end
       end
       return nil, nil
@@ -481,7 +483,7 @@ module Docopt
         o.value = value.nil? ? true : value
       end
     end
-    return [o as Pattern]
+    return [o.as Pattern]
   end
 
   def self.parse_shorts(tokens, options) : Array(Pattern)
@@ -530,25 +532,25 @@ module Docopt
       tokens.move
       result = Required.new parse_expr(tokens, options)
       raise "unmatched #{token}" if tokens.move != ")"
-      return [result as Pattern]
+      return [result.as Pattern]
     when "["
       tokens.move
       matching = "]"
       result = Optional.new parse_expr(tokens, options)
       raise "unmatched #{token}" if tokens.move != "]"
-      return [result as Pattern]
+      return [result.as Pattern]
     when "options"
       tokens.move
-      return [AnyOptions.new([] of Pattern) as Pattern]
+      return [AnyOptions.new([] of Pattern).as Pattern]
     else
       if token.starts_with?("--") && token != "--"
         return parse_long(tokens, options)
       elsif token.starts_with?("-") && token != "--" && token != "-"
         return parse_shorts(tokens, options)
       elsif token.starts_with?("<") && token.ends_with?(">") || token == token.upcase
-        return [Argument.new(tokens.move) as Pattern]
+        return [Argument.new(tokens.move).as Pattern]
       else
-        return [Command.new(tokens.move) as Pattern]
+        return [Command.new(tokens.move).as Pattern]
       end
     end
   end
@@ -558,7 +560,7 @@ module Docopt
     while ![nil, "]", ")", "|"].includes? tokens.current
       atom = parse_atom(tokens, options)
       if tokens.current == "..."
-        atom = [(OneOrMore.new atom) as Pattern]
+        atom = [(OneOrMore.new atom).as Pattern]
         tokens.move
       end
       result += atom
@@ -572,13 +574,13 @@ module Docopt
     if tokens.current != "|"
       return seq
     end
-    result = seq.size > 1 ? [Required.new(seq) as Pattern] : seq
+    result = seq.size > 1 ? [Required.new(seq).as Pattern] : seq
     while tokens.current == "|"
       tokens.move
       seq = parse_seq(tokens, options)
-      result += seq.size > 1 ? [Required.new(seq) as Pattern] : seq
+      result += seq.size > 1 ? [Required.new(seq).as Pattern] : seq
     end
-    return result.size > 1 ? [Either.new(result) as Pattern] : result
+    return result.size > 1 ? [Either.new(result).as Pattern] : result
   end
 
   def self.parse_pattern(source, options)
@@ -636,7 +638,7 @@ module Docopt
     DocoptExit.usage = usage
     options = parse_defaults(doc)
     pattern = parse_pattern(formal_usage(usage), options)
-    argv_pat = parse_argv(Tokens.from_array(argv.map{|x| x}), options, options_first)
+    argv_pat = parse_argv(Tokens.from_array(argv.map { |x| x }), options, options_first)
     pattern_options = pattern.flat Option
     pattern.flat(AnyOptions).each do |options_shortcut|
       options_shortcut_ = options_shortcut.as BranchPattern
