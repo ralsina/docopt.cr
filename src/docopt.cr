@@ -55,7 +55,7 @@ module Docopt
     getter :children
 
     def initialize
-      @children = nil as (Array(Pattern) | Nil)
+      @children = nil.as(Array(Pattern) | Nil)
     end
 
     def ==(other : Pattern) : Bool
@@ -84,12 +84,12 @@ module Docopt
       if uniq.nil?
         uniq = flat.uniq
       end
-      uniq_ = uniq as Array(Pattern)
-      children = @children as Array(Pattern)
+      uniq_ = uniq.as Array(Pattern)
+      children = @children.as Array(Pattern)
       children.each_with_index do |child, i|
         if child.children.nil?
           raise "#{child} not in #{uniq}" if !uniq_.includes? child
-          children[i] = uniq_[uniq_.index(child) as Int32]
+          children[i] = uniq_[uniq_.index(child).as Int32]
         else
           child.fix_identities(uniq_)
         end
@@ -99,18 +99,18 @@ module Docopt
 
     def fix_repeating_arguments : Pattern
       # Fix elements that should accumulate/increment values.
-      (either.children as Array(Pattern)).map { |c| c.children as Array(Pattern) }.each do |case_|
+      (either.children.as Array(Pattern)).map { |c| c.children.as Array(Pattern) }.each do |case_|
         case_.select { |c| case_.count(c) > 1 }.map do |e|
-          if e.class == Argument || e.class == Option && (e as Option).argcount > 0
-            e_ = (e as (Argument | Option))
+          if e.class == Argument || e.class == Option && (e.as Option).argcount > 0
+            e_ = (e.as (Argument | Option))
             if e_.value.nil?
               e_.value = [] of String
             elsif !e_.value.is_a? Array
-              e_.value = (e_.value as String).split
+              e_.value = (e_.value.as String).split
             end
           end
-          if e.class == Command || e.class == Option && (e as Option).argcount == 0
-            (e as (Command | Option)).value = 0
+          if e.class == Command || e.class == Option && (e.as Option).argcount == 0
+            (e.as (Command | Option)).value = 0
           end
         end
       end
@@ -119,37 +119,37 @@ module Docopt
 
     def either : Either
       result = [] of Array(Pattern)
-      groups = [[self as Pattern]] as Array(Array(Pattern))
+      groups = [[self.as Pattern]].as Array(Array(Pattern))
       while groups.size > 0
         children = groups.delete_at 0
         types = children.map { |c| c.class }
         if types.includes? Either
-          either = children.select { |c| c.class == Either }[0] as Either
-          children.delete_at(children.index(either) as Int32)
-          (either.children as Array(Pattern)).each do |c|
+          either = children.select { |c| c.class == Either }[0].as Either
+          children.delete_at(children.index(either).as Int32)
+          (either.children.as Array(Pattern)).each do |c|
             groups << [c] + children
           end
         elsif types.includes? Required
-          required = children.select { |c| c.class == Required }[0] as Required
-          children.delete_at(children.index(required) as Int32)
-          groups << ((required.children as Array(Pattern)) + children)
+          required = children.select { |c| c.class == Required }[0].as Required
+          children.delete_at(children.index(required).as Int32)
+          groups << ((required.children.as Array(Pattern)) + children)
         elsif types.includes? Optional
-          optional = children.select { |c| c.class == Optional }[0] as Optional
-          children.delete_at(children.index(optional) as Int32)
-          groups << ((optional.children as Array(Pattern)) + children)
+          optional = children.select { |c| c.class == Optional }[0].as Optional
+          children.delete_at(children.index(optional).as Int32)
+          groups << ((optional.children.as Array(Pattern)) + children)
         elsif types.includes? AnyOptions
-          optional = children.select { |c| c.class == AnyOptions }[0] as AnyOptions
-          children.delete_at(children.index(optional) as Int32)
-          groups << ((optional.children as Array(Pattern)) + children)
+          optional = children.select { |c| c.class == AnyOptions }[0].as AnyOptions
+          children.delete_at(children.index(optional).as Int32)
+          groups << ((optional.children.as Array(Pattern)) + children)
         elsif types.includes? OneOrMore
-          oneormore = children.select { |c| c.class == OneOrMore }[0] as OneOrMore
-          children.delete_at(children.index(oneormore) as Int32)
-          groups << ((oneormore.children as Array(Pattern))*2 + children)
+          oneormore = children.select { |c| c.class == OneOrMore }[0].as OneOrMore
+          children.delete_at(children.index(oneormore).as Int32)
+          groups << ((oneormore.children.as Array(Pattern))*2 + children)
         else
           result << children
         end
       end
-      return Either.new(result.map { |e| Required.new(e) as Pattern })
+      return Either.new(result.map { |e| Required.new(e).as Pattern })
     end
 
     abstract def flat(*types)
@@ -164,7 +164,7 @@ module Docopt
     property :value
 
     def initialize(@name : (String | Nil), @value : (Nil | String | Int32 | Bool | Array(String)) = nil)
-      @children = nil as (Array(Pattern) | Nil)
+      @children = nil.as (Array(Pattern) | Nil)
     end
 
     def to_s
@@ -173,7 +173,7 @@ module Docopt
 
     def flat(*types)
       if types.size == 0 || types.includes? self.class
-        return [self as Pattern]
+        return [self.as Pattern]
       end
       return [] of Pattern
     end
@@ -182,13 +182,13 @@ module Docopt
       # def match(left, collected = nil)
       # @TODO
       collected = [] of Pattern if collected.nil?
-      collected_ = collected as Array(Pattern)
+      collected_ = collected.as Array(Pattern)
       pos, match = single_match(left)
       if match.nil?
         return false, left, collected_
       end
-      pos_ = pos as Int32
-      match_ = match as LeafPattern
+      pos_ = pos.as Int32
+      match_ = match.as LeafPattern
       left_ = left[0, pos_] + left[pos_ + 1, left.size]
       same_name = collected_.select { |a| a.is_a?(LeafPattern) && a.name == @name }
       if [Int32, Array(String)].includes? @value.class
@@ -196,25 +196,25 @@ module Docopt
           increment = 1
           if same_name.size == 0
             match_.value = increment
-            return true, left_, collected_ + ([match_ as Pattern])
+            return true, left_, collected_ + ([match_.as Pattern])
           end
-          value = (same_name[0] as LeafPattern).value as Int32
+          value = (same_name[0].as LeafPattern).value.as Int32
           value += increment
-          (same_name[0] as LeafPattern).value = value
+          (same_name[0].as LeafPattern).value = value
           return true, left_, collected_
         else
-          increment = match_.value.class == String ? ([match_.value as String]) : (match_.value as Array(String))
+          increment = match_.value.class == String ? ([match_.value.as String]) : (match_.value.as Array(String))
           if same_name.size == 0
             match_.value = increment
-            return true, left_, collected_ + ([match_ as Pattern])
+            return true, left_, collected_ + ([match_.as Pattern])
           end
-          value = (same_name[0] as LeafPattern).value as Array(String)
+          value = (same_name[0].as LeafPattern).value.as Array(String)
           value += increment
-          (same_name[0] as LeafPattern).value = value
+          (same_name[0].as LeafPattern).value = value
           return true, left_, collected_
         end
       end
-      return true, left_, collected_ + ([match_ as Pattern])
+      return true, left_, collected_ + ([match_.as Pattern])
     end
 
     abstract def single_match(left)
@@ -228,16 +228,16 @@ module Docopt
     end
 
     def to_s
-      children = @children as Array(Pattern)
+      children = @children.as Array(Pattern)
       "#{self.class.to_s.split("::")[-1]}(#{children.map { |c| c.to_s }.join ", "})"
     end
 
     def flat(*types)
       if types.includes? self.class
-        return [self as Pattern]
+        return [self.as Pattern]
       end
       ret = [] of Pattern
-      children = @children as Array(Pattern)
+      children = @children.as Array(Pattern)
       children.each do |c|
         c.flat(*types).each do |p|
           ret << p
@@ -252,12 +252,12 @@ module Docopt
       # def match(left, collected = nil)
       collected = [] of Pattern if collected.nil?
       l = left
-      c = collected as Array(Pattern)
-      ch = @children as Array(Pattern)
+      c = collected.as Array(Pattern)
+      ch = @children.as Array(Pattern)
       ch.each do |pat|
         matched, l, c = pat.match(l, c)
         if !matched
-          return false, left, (collected as Array(Pattern))
+          return false, left, (collected.as Array(Pattern))
         end
       end
       return true, l, c
@@ -268,7 +268,7 @@ module Docopt
     def match(left : Array(Pattern), collected : (Nil | Array(Pattern)) = nil) : Tuple(Bool, Array(Pattern), Array(Pattern))
       # def match(left, collected = nil)
       collected = [] of Pattern if collected.nil?
-      ch = @children as Array(Pattern)
+      ch = @children.as Array(Pattern)
       ch.each do |pat|
         m, left, collected = pat.match(left, collected)
       end
@@ -283,7 +283,7 @@ module Docopt
     def single_match(left)
       left.each_with_index do |pat, n|
         if pat.is_a? Argument
-          return n, Argument.new @name, pat.value
+          return n, Argument.new(@name, value: pat.value.as((Nil | String | Int32 | Bool | Array(String))))
         end
       end
       return nil, nil
@@ -322,7 +322,7 @@ module Docopt
   class OneOrMore < BranchPattern
     def match(left : Array(Pattern), collected : (Nil | Array(Pattern)) = nil) : Tuple(Bool, Array(Pattern), Array(Pattern))
       # def match(left, collected = nil)
-      ch = @children as Array(Pattern)
+      ch = @children.as Array(Pattern)
       raise "#{ch}.size != 1" if ch.size != 1
       collected = [] of Pattern if collected.nil?
       l = left
@@ -350,7 +350,7 @@ module Docopt
       # def match(left, collected = nil)
       collected = [] of Pattern if collected.nil?
       outcomes = [] of Tuple(Bool, Array(Pattern), Array(Pattern))
-      ch = @children as Array(Pattern)
+      ch = @children.as Array(Pattern)
       ch.each do |pat|
         matched, _, _ = outcome = pat.match(left, collected)
         if matched
@@ -449,14 +449,14 @@ module Docopt
   end
 
   def self.parse_long(tokens, options) : Array(Pattern)
-    tok = tokens.move as String
+    tok = tokens.move.as String
     long_value = tok.split("=", limit = 2)
     long = long_value[0]
     raise "long pattern should start with '--'" if !long.starts_with? "--"
     value = long_value.size <= 1 ? nil : long_value[1]
     similar = options.select { |o| o.long == long }
     if tokens.error == DocoptExit && similar.size == 0
-      similar = options.select { |o| (o.long as String).starts_with? long }
+      similar = options.select { |o| (o.long.as String).starts_with? long }
     end
     if similar.size > 1
       raise tokens.error.new "#{long} is not a uniq prefix: #{similar.map { |s| s.long }.join(", ")}?"
@@ -486,7 +486,7 @@ module Docopt
 
   def self.parse_shorts(tokens, options) : Array(Pattern)
     # shorts ::= '-' ( chars )* [ [ ' ' ] chars ] ;
-    token = tokens.move as String
+    token = tokens.move.as String
     raise "short pattern should start swith -" if !(token.starts_with?("-") && !token.starts_with?("--"))
     left = token.gsub(/^\-+/, "")
     parsed = [] of Pattern
@@ -516,7 +516,7 @@ module Docopt
           o.value = value.nil? ? true : value
         end
       end
-      parsed << (o as Pattern)
+      parsed << (o.as Pattern)
     end
     return parsed
   end
@@ -524,7 +524,7 @@ module Docopt
   def self.parse_atom(tokens, options) : Array(Pattern)
     # atom ::= '(' expr ')' | '[' expr ']' | 'options'
     #         | long | shorts | argument | command ;
-    token = tokens.current as String # @TODO maybe nil
+    token = tokens.current.as String # @TODO maybe nil
     case token
     when "("
       tokens.move
@@ -596,7 +596,7 @@ module Docopt
     #    argv ::= [ long | shorts | argument ]* [ '--' [ argument ]* ] ;
     parsed = [] of Pattern
     while !tokens.current.nil?
-      tok = tokens.current as String
+      tok = tokens.current.as String
       if tok == "--"
         return parsed + tokens.map { |v| Argument.new nil, v }
       elsif tok.starts_with? "--"
@@ -636,19 +636,19 @@ module Docopt
     DocoptExit.usage = usage
     options = parse_defaults(doc)
     pattern = parse_pattern(formal_usage(usage), options)
-    argv = parse_argv(Tokens.from_array(argv as Array(String)), options, options_first)
+    argv_pat = parse_argv(Tokens.from_array(argv.map{|x| x}), options, options_first)
     pattern_options = pattern.flat Option
     pattern.flat(AnyOptions).each do |options_shortcut|
-      options_shortcut_ = options_shortcut as BranchPattern
-      options_shortcut_.children = (options - pattern_options).uniq.map { |x| x as Pattern }
+      options_shortcut_ = options_shortcut.as BranchPattern
+      options_shortcut_.children = (options - pattern_options).uniq.map { |x| x.as Pattern }
     end
-    extras(help, version, argv, doc)
-    matched, left, collected = pattern.fix.match(argv)
+    extras(help, version, argv_pat, doc)
+    matched, left, collected = pattern.fix.match(argv_pat)
     if matched && left.size == 0
       dic = {} of String => (Nil | String | Int32 | Bool | Array(String))
       (pattern.flat + collected).each do |a|
         if a.is_a? LeafPattern
-          name = a.name as String
+          name = a.name.as String
           dic[name] = a.value
         end
       end

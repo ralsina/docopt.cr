@@ -41,7 +41,7 @@ describe "Docopt" do
   it "should support repeat options" do
     # With value
     ans = process.call(["save", "--files=a.txt", "--files=b.txt"])
-    farr = ans["--files"] as Array(String)
+    farr = ans["--files"].as(Array(String))
     "a.txt".should eq(farr[0])
     "b.txt".should eq(farr[1])
 
