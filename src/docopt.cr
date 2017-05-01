@@ -193,7 +193,7 @@ module Docopt
       match_ = match.as LeafPattern
       left_ = left[0, pos_] + left[pos_ + 1, left.size]
       same_name = collected_.select { |a| a.is_a?(LeafPattern) && a.name == @name }
-      if [Int32, Array(String)].includes? @value.class
+      if Int32 == @value.class || Array(String) == @value.class
         if @value.class == Int32
           increment = 1
           if same_name.size == 0
