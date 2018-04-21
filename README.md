@@ -18,7 +18,7 @@ dependencies:
 
 
 ```crystal
-require "docopt.cr"
+require "docopt"
 describe "Docopt" do
   # TODO: Write tests
 
