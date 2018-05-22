@@ -1,11 +1,11 @@
 module Docopt
-  class DocoptEception < Exception
+  class DocoptException < Exception
   end
 
-  class DocoptLanguageError < DocoptEception
+  class DocoptLanguageError < DocoptException
   end
 
-  class DocoptExit < DocoptEception
+  class DocoptExit < DocoptException
     @@usage = ""
 
     def self.usage=(u : String)
