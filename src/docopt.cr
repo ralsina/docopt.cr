@@ -62,7 +62,7 @@ module Docopt
       return to_s == other.to_s
     end
 
-    def insepct(io)
+    def inspect(io)
       io << to_s
     end
 
