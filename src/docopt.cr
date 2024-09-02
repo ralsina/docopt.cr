@@ -17,13 +17,22 @@ module Docopt
     end
   end
 
-  class Tokens < Array(String)
+  class Tokens 
+    @internal : Array(String) = [] of String
     property :error
     @error : (DocoptExit.class | DocoptLanguageError.class)
+
 
     def initialize(@error : (DocoptExit.class | DocoptLanguageError.class) = DocoptExit)
       super()
     end
+    delegate :<<, to: @internal
+    delegate :[], to: @internal
+    delegate size, to: @internal
+    delegate delete_at, to: @internal
+    delegate join, to: @internal
+    delegate map, to: @internal
+
 
     def self.from_pattern(source : String) : Tokens
       ret = Tokens.new (DocoptExit)
