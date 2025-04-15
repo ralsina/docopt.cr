@@ -375,10 +375,16 @@ module Docopt
   end
 
   class Option < LeafPattern
-    getter :short, :long, :argcount
+    getter :short, :long, :argcount, :description
     property :value
 
-    def initialize(@short : (String | Nil) = nil, @long : (String | Nil) = nil, @argcount = 0, value = false)
+    def initialize(
+      @short : (String | Nil) = nil,
+      @long : (String | Nil) = nil,
+      @argcount = 0,
+      value = false,
+      @description : String = ""
+    )
       raise "argcount not in [0,1]" if argcount != 0 && argcount != 1
       value = (value == false && argcount > 0) ? nil : value
       if !long.nil?
@@ -411,7 +417,7 @@ module Docopt
           value = nil
         end
       end
-      Option.new short, long, argcount, value
+      Option.new short, long, argcount, value, description.strip
     end
 
     def single_match(left)

@@ -5,8 +5,4 @@ authors:
   - chenkovsky.chen <chenkov@yeah.net>
   - Roberto Alsina <roberto.alsina@gmail.com>
   
-dependencies:
-  crustache:
-    github: MakeNowJust/crustache
-
 license: MIT

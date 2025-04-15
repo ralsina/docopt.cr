@@ -66,4 +66,103 @@ describe "Docopt" do
       Docopt.docopt("", ["ship"], help: false, exit: false)
     end
   end
+
+  it "should parse option_help" do
+    bash_completion = Docopt::BashCompletion.new full_doc
+    _, option_help = bash_completion.parse_params
+    # The python version uses "--speed=" but this looks good enough
+    expected = {"--drifting" => "Drifting mine.",
+                "--help"     => "Show this screen.",
+                "--moored"   => "Moored (anchored) mine.",
+                "--speed"    => "Speed in knots [default: 10].",
+                "--version"  => "Show version.",
+                "-h"         => "Show this screen.",
+                "-s"         => "Speed in knots [default: 10].",
+    }
+    option_help.size.should eq expected.size
+    option_help.each do |key, value|
+      expected[key].should eq value
+    end
+  end
+
+  it "should parse param_tree" do
+    bash_completion = Docopt::BashCompletion.new full_doc
+    param_tree, _ = bash_completion.parse_params
+
+    expected = %(cmds:
+    init:
+         cmds:
+         args: []
+         opts: ["-v"]
+
+    ship:
+         cmds:
+             new:
+                 cmds:
+                 args: ["<name>"]
+                 opts: []
+
+             move:
+                  cmds:
+                  args: ["<x>", "<y>"]
+                  opts: ["-s=", "--speed="]
+
+             shoot:
+                   cmds:
+                   args: ["<x>", "<y>"]
+                   opts: []
+
+         args: ["<name>"]
+         opts: []
+
+    mine:
+         cmds:
+             set:
+                 cmds:
+                 args: []
+                 opts: []
+
+             remove:
+                    cmds:
+                    args: []
+                    opts: []
+
+         args: ["<x>", "<y>"]
+         opts: ["--moored", "--drifting"]
+
+    save:
+         cmds:
+         args: []
+         opts: ["--files="]
+
+    set_speed:
+              cmds:
+              args: []
+              opts: ["-s=", "--speed="]
+
+args: []
+opts: ["-h", "--help", "-h", "--help", "--version"]
+)
+    expected.should eq param_tree.repr
+  end
+
+  it "should create bash completion" do
+    bash_completion = Docopt.bash_completion("x", full_doc)
+    bash_completion.should_not be_nil
+    expected = <<-EXPECTED
+
+_x()
+{
+    local cur
+    cur="${COMP_WORDS[COMP_CWORD]}"
+
+    if [ $COMP_CWORD -eq 1 ]; then
+        COMPREPLY=( $( compgen -W '-h --help -h --help --version init ship mine save set_speed' -- $cur) )    else
+        case ${COMP_WORDS[1]} in
+            init)
+            _x_init
+        ;;
+EXPECTED
+    bash_completion[..300].strip.should eq expected.strip
+  end
 end
