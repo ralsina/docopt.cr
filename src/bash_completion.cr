@@ -69,8 +69,9 @@ module Docopt
   class BashCompletion
     @doc : String
     @usage : String
+    @custom_completions : Hash(String, String)
 
-    def initialize(@doc)
+    def initialize(@doc, @custom_completions = {} of String => String)
       @usage = Docopt.parse_section("usage:", @doc)[0]
     end
 
@@ -124,7 +125,12 @@ TMPL
       opts = param_tree.options
       subcommand_switch = create_subcommand_switch(cmd_name, level_num, subcommands.keys, opts)
       op = subcommands.empty? ? "ge" : "eq"
-      compreply = create_compreply(param_tree)
+
+      if @custom_completions.keys.includes? cmd_name
+        compreply = "-W \"#{@custom_completions[cmd_name]}\""
+      else
+        compreply = create_compreply(param_tree)
+      end
 
       # SECTION_TEMPLATE (original mustache)
       #
@@ -229,8 +235,12 @@ complete -o bashdefault -o default -o filenames -F _#{sanitize_name(cmd)} #{cmd}
     end
   end
 
-  def bash_completion(cmd : String, help : String) : String
-    completion = BashCompletion.new help
+  def bash_completion(
+    cmd : String,
+    help : String,
+    custom_completions = {} of String => String
+  ) : String
+    completion = BashCompletion.new help, {"x_init" => "$(ls -l /)"}
     param_tree, option_help = completion.parse_params
     completion.get_completion_file_content(cmd, param_tree, option_help)
   end

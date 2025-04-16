@@ -165,4 +165,22 @@ _x()
 EXPECTED
     bash_completion[..300].strip.should eq expected.strip
   end
+
+  it "should insert custom completion commands" do
+    expected = <<-EXPECTED
+_x_init()
+{
+    local cur
+    cur="${COMP_WORDS[COMP_CWORD]}"
+
+    if [ $COMP_CWORD -ge 2 ]; then
+        COMPREPLY=( $( compgen -W "$(ls -l /)" -- $cur) )
+    fi
+}
+EXPECTED
+
+    bash_completion = Docopt.bash_completion("x", full_doc, {"x_init" => "$(ls -l /)"})
+    bash_completion.should_not be_nil
+    (bash_completion.includes? expected).should be_true
+  end
 end
