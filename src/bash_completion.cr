@@ -74,10 +74,6 @@ module Docopt
       @usage = Docopt.parse_section("usage:", @doc)[0]
     end
 
-    def get_name : String
-      "BASH with bash-completion"
-    end
-
     def get_completion_path : String
       "/etc/bash_completion.d"
     end
@@ -112,34 +108,6 @@ module Docopt
 #{subcommand_cases}
         esac
 TMPL
-    end
-
-    def get_options_descriptions(doc : String) : Array(Tuple(String, String))
-      descriptions = [] of Tuple(String, String)
-
-      options
-
-      sanitize_line = ->(line : String) do
-        line.gsub("'", "'\\''").gsub("[", "\\[").gsub("]", "\\]").strip
-      end
-
-      doc.scan(/\n  .*/) do |match|
-        options, partition, description = match.string.strip.partition("  ")
-        next unless partition
-
-        if !options.starts_with?("-")
-          descriptions << {options, sanitize_line.call(description)}
-          next
-        end
-
-        options = options.gsub(",", " ")
-        options = options.gsub(/=\S+/, "= ")
-        options.split.each do |s|
-          descriptions << {s, sanitize_line.call(description)}
-        end
-      end
-
-      descriptions
     end
 
     def create_compreply(param_tree : CommandParams) : String
