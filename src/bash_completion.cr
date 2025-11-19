@@ -240,7 +240,7 @@ complete -o bashdefault -o default -o filenames -F _#{sanitize_name(cmd)} #{cmd}
     help : String,
     custom_completions = {} of String => String
   ) : String
-    completion = BashCompletion.new help, {"x_init" => "$(ls -l /)"}
+    completion = BashCompletion.new help, custom_completions
     param_tree, option_help = completion.parse_params
     completion.get_completion_file_content(cmd, param_tree, option_help)
   end

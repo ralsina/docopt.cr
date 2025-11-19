@@ -86,7 +86,7 @@ module Docopt
       ["_files"]
     end
 
-    def create_function_body(cmd_name : String, param_tree : CommandParams, option_help : Hash(String, String), indent : Int32 = 0) : String
+    def create_function_body(cmd_name : String, param_tree : CommandParams, option_help : Hash(String, String), command_parts : Array(String), indent : Int32 = 0) : String
       lines = [] of String
       indent_str = "  " * indent
 
@@ -106,9 +106,10 @@ module Docopt
         lines << "#{indent_str}_arguments -s -S #{option_args.join(" ")}" unless option_args.empty?
       end
 
-      # Handle arguments
+      # Handle arguments with proper custom completion names
       unless param_tree.arguments.empty?
-        argument_completions = create_argument_completions(param_tree.arguments, cmd_name)
+        custom_name = command_parts.join("_")
+        argument_completions = create_argument_completions(param_tree.arguments, custom_name)
         argument_completions.each do |completion|
           lines << "#{indent_str}#{completion}"
         end
@@ -117,8 +118,9 @@ module Docopt
       lines.join("\n")
     end
 
-    def create_completion_function(cmd_name : String, param_tree : CommandParams, option_help : Hash(String, String), function_name : String? = nil) : String
-      function_name ||= "_#{cmd_name}"
+    def create_completion_function(cmd_name : String, param_tree : CommandParams, option_help : Hash(String, String), function_name : String? = nil, command_parts : Array(String) = [] of String) : String
+      function_name ||= "_#{sanitize_name(cmd_name)}"
+      current_command_parts = command_parts.empty? ? [cmd_name] : command_parts
 
       # Main function header
       header = <<-HEADER
@@ -132,12 +134,20 @@ HEADER
       state_machine = create_state_machine(cmd_name, param_tree, option_help, function_name)
 
       # Main function body
-      body = create_function_body(cmd_name, param_tree, option_help, 1)
+      body = create_function_body(cmd_name, param_tree, option_help, current_command_parts, 1)
+
+      # Generate subcommand functions
+      subcommand_functions = ""
+      param_tree.subcommands.each do |subcommand_name, subcommand_tree|
+        sub_function_name = "#{function_name}_#{subcommand_name}"
+        new_command_parts = current_command_parts + [subcommand_name]
+        subcommand_functions += "\n" + create_completion_function(cmd_name, subcommand_tree, option_help, sub_function_name, new_command_parts)
+      end
 
       # Footer
       footer = "\n}"
 
-      "#{header}#{state_machine}#{body}#{footer}"
+      "#{header}#{state_machine}#{body}#{subcommand_functions}#{footer}"
     end
 
     def create_state_machine(cmd_name : String, param_tree : CommandParams, option_help : Hash(String, String), function_name : String) : String
