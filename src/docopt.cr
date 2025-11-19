@@ -687,3 +687,8 @@ module Docopt
     end
   end
 end
+
+# Require completion modules
+require "./bash_completion"
+require "./fish_completion"
+require "./zsh_completion"

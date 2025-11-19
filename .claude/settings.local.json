@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(crystal:*)",
+      "Bash(find:*)",
+      "Bash(git checkout:*)",
+      "Bash(ameba --fix)",
+      "Bash(git add:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

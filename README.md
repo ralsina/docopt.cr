@@ -8,9 +8,9 @@ This is a fork of the original [docopt.cr by chenkovsky](https://github.com/chen
 It has a couple of bugfixes and I am now starting to add new features:
 
 * bash completion generation
+* fish completion generation
+* zsh completion generation
 * Custom hooks for smarter completion
-* zsh completion generation [TBD]
-* fish completion generation [TBD]
 
 
 ## Installation
@@ -72,29 +72,64 @@ end
 
 ## Shell Completion Generation
 
-docopt.cr can generate shell completion scripts for bash (other shells to come)
+docopt.cr can generate shell completion scripts for bash, fish, and zsh
 so that when you `TAB` while writing a command it will show you the possible
 options.
 
-The code to create a bash completion looks like this for the classic 
+### Bash Completion
+
+The code to create a bash completion looks like this for the classic
 `naval_fate` example:
 
 ```crystal
     bash_completion = Docopt.bash_completion("naval_fate", doc)
 ```
 
-This will give you a reasonable bash completion. To make this available to the user
-you could have something like a `naval_fate --completion` in your usage instructions
-and either tell the user to put this in their `.bashrc`:
+To make this available to the user you could have something like a `naval_fate --completion-bash`
+in your usage instructions and either tell the user to put this in their `.bashrc`:
 
 ```bash
-    naval_fate --completion >> ~/.bashrc
+    naval_fate --completion-bash >> ~/.bashrc
 ```
 
 Or write it to a file and put it in /etc/bash_completion.d/:
 
 ```bash
-    naval_fate --completion > /etc/bash_completion.d/naval_fate
+    naval_fate --completion-bash > /etc/bash_completion.d/naval_fate
+```
+
+### Fish Completion
+
+For fish shell completion:
+
+```crystal
+    fish_completion = Docopt.fish_completion("naval_fate", doc)
+```
+
+Users can install fish completions by adding to their config:
+
+```bash
+    naval_fate --completion-fish > ~/.config/fish/completions/naval_fate.fish
+```
+
+### ZSH Completion
+
+For zsh shell completion:
+
+```crystal
+    zsh_completion = Docopt.zsh_completion("naval_fate", doc)
+```
+
+Users can install zsh completions by adding:
+
+```bash
+    naval_fate --completion-zsh > ~/.local/share/zsh/site-functions/_naval_fate
+```
+
+Or system-wide:
+
+```bash
+    naval_fate --completion-zsh > /usr/share/zsh/site-functions/_naval_fate
 ```
 
 ## Custom Completions
@@ -134,6 +169,25 @@ using `bash` ability to run commands inside other commands:
 
 And the completion for `naval_fate ship new` would be the output of
 `naval_fate ship list`.
+
+### Custom Completions for All Shells
+
+The custom completion system works consistently across all three shells:
+
+```crystal
+    # Define custom completions once
+    completions = {
+      "naval_fate_ship_new" => "$(naval_fate ship list)",
+      "naval_fate_mine_set" => %("anchored drifting")
+    }
+
+    # Use with any shell
+    bash_completion = Docopt.bash_completion("naval_fate", doc, completions)
+    fish_completion = Docopt.fish_completion("naval_fate", doc, completions)
+    zsh_completion = Docopt.zsh_completion("naval_fate", doc, completions)
+```
+
+This ensures consistent completion behavior regardless of which shell the user prefers.
 
 ## Development
 
