@@ -189,9 +189,43 @@ The custom completion system works consistently across all three shells:
 
 This ensures consistent completion behavior regardless of which shell the user prefers.
 
+## Examples
+
+See the `examples/` directory for a complete working example:
+
+### Naval Fate CLI
+
+The `naval_fate` application demonstrates real-world usage:
+
+```bash
+# Build and run the example
+cd examples
+crystal build naval_fate.cr -o naval_fate
+./naval_fate --help
+
+# Generate completions
+./naval_fate --completion-bash > ~/.bash_completion.d/naval_fate
+./naval_fate --completion-fish > ~/.config/fish/completions/naval_fate.fish
+./naval_fate --completion-zsh > ~/.local/share/zsh/site-functions/_naval_fate
+```
+
+Features demonstrated:
+- Multi-subcommand CLI structure
+- Custom completions with dynamic ship names
+- Real-time fleet management
+- Shell-appropriate completion behaviors
+
+Run `examples/test_completion.sh` to see a complete demonstration of the completion functionality.
+
 ## Development
 
-TODO: Write development instructions here
+### Building
+
+```bash
+crystal build src/docopt.cr
+crystal spec  # Run tests
+ameba --fix  # Run linter
+```
 
 ## Contributing
 
