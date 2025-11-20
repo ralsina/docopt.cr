@@ -5,7 +5,8 @@
       "Bash(find:*)",
       "Bash(git checkout:*)",
       "Bash(ameba --fix)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(./naval_fate --completion-fish)"
     ],
     "deny": [],
     "ask": []

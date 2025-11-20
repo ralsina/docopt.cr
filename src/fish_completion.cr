@@ -50,12 +50,30 @@ module Docopt
 
       options.each do |option|
         description = option_help[option]? || option
-        if option.starts_with?("--")
-          # Long option
-          completions << "complete -c #{command_parts.first} -l #{option[2..]} -d '#{description}'"
-        elsif option.starts_with?("-") && option.size > 1
-          # Short option
-          completions << "complete -c #{command_parts.first} -s #{option[1]} -d '#{description}'"
+        option_name = option.chomp("=")
+
+        # Check if this option takes arguments and has custom completions
+        if option.ends_with?("=") && @custom_completions.has_key?(option_name)
+          custom_completion = @custom_completions[option_name]
+
+          if option.starts_with?("--")
+            # Long option with custom completion
+            completions << "complete -c #{command_parts.first} -l #{option_name[2..]} -d '#{description}'"
+            completions << "complete -c #{command_parts.first} -f -n '__fish_seen_subcommand_from #{command_parts.first} and __fish_seen_option -l #{option_name[2..]}' -a '#{custom_completion}'"
+          elsif option.starts_with?("-") && option.size > 1
+            # Short option with custom completion
+            completions << "complete -c #{command_parts.first} -s #{option[1]} -d '#{description}'"
+            completions << "complete -c #{command_parts.first} -f -n '__fish_seen_subcommand_from #{command_parts.first} and __fish_seen_option -s #{option[1]}' -a '#{custom_completion}'"
+          end
+        else
+          # Regular option without custom completion
+          if option.starts_with?("--")
+            # Long option
+            completions << "complete -c #{command_parts.first} -l #{option[2..]} -d '#{description}'"
+          elsif option.starts_with?("-") && option.size > 1
+            # Short option
+            completions << "complete -c #{command_parts.first} -s #{option[1]} -d '#{description}'"
+          end
         end
       end
 

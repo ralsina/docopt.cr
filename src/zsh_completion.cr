@@ -40,8 +40,14 @@ module Docopt
         if option.starts_with?("--")
           # Long option
           arg_name = option[2..]
-          if option.ends_with?("=")
-            # Option takes an argument
+          option_name = option.chomp("=")
+
+          if option.ends_with?("=") && @custom_completions.has_key?(option_name)
+            # Option takes an argument with custom completion
+            custom_completion = @custom_completions[option_name]
+            args << "'--#{arg_name}[#{description}]:{$(#{custom_completion})}'"
+          elsif option.ends_with?("=")
+            # Option takes an argument without custom completion
             args << "'--#{arg_name[0..-2]}[#{description}]:'"
           else
             # Boolean option
@@ -50,8 +56,14 @@ module Docopt
         elsif option.starts_with?("-") && option.size > 1
           # Short option
           arg_name = option[1]
-          if option.ends_with?("=")
-            # Option takes an argument
+          option_name = option.chomp("=")
+
+          if option.ends_with?("=") && @custom_completions.has_key?(option_name)
+            # Option takes an argument with custom completion
+            custom_completion = @custom_completions[option_name]
+            args << "'-#{arg_name}[#{description}]:{$(#{custom_completion})}'"
+          elsif option.ends_with?("=")
+            # Option takes an argument without custom completion
             args << "'-#{arg_name}[#{description}]:'"
           else
             # Boolean option

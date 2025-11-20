@@ -18,6 +18,7 @@ Usage:
   naval_fate fleet status
   naval_fate save [--files=files...]
   naval_fate set_speed [--speed=<kn>]
+  naval_fate set_alert [--level=<level>]
   naval_fate --completion-bash
   naval_fate --completion-fish
   naval_fate --completion-zsh
@@ -25,12 +26,16 @@ Usage:
   naval_fate --version
 
 Options:
-  -h --help        Show this screen.
-  --version        Show version.
-  -s,--speed=<kn>  Speed in knots [default: 10].
-  --moored         Moored (anchored) mine.
-  --drifting       Drifting mine.
-  --files=<files>  List of files to save.
+  -h --help           Show this screen.
+  --version           Show version.
+  -s,--speed=<kn>     Speed in knots [default: 10].
+  --moored            Moored (anchored) mine.
+  --drifting          Drifting mine.
+  --files=<files>     List of files to save.
+  --level=<level>     Alert level [default: normal].
+  --completion-bash   Generate bash completion script.
+  --completion-fish   Generate fish completion script.
+  --completion-zsh    Generate zsh completion script.
 
 Examples:
   naval_fate ship new "USS Enterprise" "USS Constitution"
@@ -96,7 +101,11 @@ CUSTOM_COMPLETIONS = {
   "naval_fate_ship"          => ShipDatabase.list_ships,
   "naval_fate_mine_set"      => "$(echo '10 20 30 40 50 60')",
   "naval_fate_mine_remove"   => MineTracker.list_mines,
-  "naval_fate_files"         => "$(ls *.txt *.md 2>/dev/null || echo 'config.txt log.md')"
+  "naval_fate_files"         => "$(ls *.txt *.md 2>/dev/null || echo 'config.txt log.md')",
+  # Option-level custom completions
+  "--speed"                  => "5 10 15 20 25 30",
+  "--level"                  => "low normal high critical",
+  "-s"                       => "5 10 15 20 25 30"
 }
 
 # Main application logic
@@ -202,6 +211,12 @@ def run_naval_fate(args = ARGV)
     if arguments["set_speed"]?
       speed = arguments["--speed"]? || "10"
       puts "⚡ Default fleet speed set to #{speed} knots"
+    end
+
+    # Set alert command
+    if arguments["set_alert"]?
+      level = arguments["--level"]? || "normal"
+      puts "🚨 Alert level set to #{level}"
     end
 
   rescue Docopt::DocoptExit

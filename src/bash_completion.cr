@@ -120,16 +120,58 @@ TMPL
       "#{flag} '#{word_list}'"
     end
 
+    def create_option_compreply(param_tree : CommandParams) : String
+      return "" if param_tree.options.empty?
+
+      completions = [] of String
+
+      param_tree.options.each do |option|
+        option_name = option.chomp("=")
+
+        # Check if this option takes arguments and has custom completions
+        if option.ends_with?("=") && @custom_completions.has_key?(option_name)
+          custom_completion = @custom_completions[option_name]
+          if option.starts_with?("--")
+            # Long option with custom completion
+            completions << "--#{option_name[2..]}=#{custom_completion}"
+          elsif option.starts_with?("-") && option.size > 1
+            # Short option with custom completion
+            completions << "-#{option[1]} #{custom_completion}"
+          end
+        else
+          # Regular option without custom completion
+          if option.starts_with?("--")
+            completions << "--#{option[2..]}"
+          elsif option.starts_with?("-") && option.size > 1
+            completions << "-#{option[1]}"
+          end
+        end
+      end
+
+      if completions.empty?
+        ""
+      else
+        "-W '#{completions.join(" ")}'"
+      end
+    end
+
     def create_section(cmd_name : String, param_tree : CommandParams, option_help : Hash(String, String), level_num : Int32) : String
       subcommands = param_tree.subcommands
       opts = param_tree.options
       subcommand_switch = create_subcommand_switch(cmd_name, level_num, subcommands.keys, opts)
       op = subcommands.empty? ? "ge" : "eq"
 
+      # Check for custom completions (both command-level and option-level)
       if @custom_completions.keys.includes? cmd_name
         compreply = "-W \"#{@custom_completions[cmd_name]}\""
       else
-        compreply = create_compreply(param_tree)
+        # Check if we have custom option completions
+        option_compreply = create_option_compreply(param_tree)
+        if option_compreply.empty?
+          compreply = create_compreply(param_tree)
+        else
+          compreply = option_compreply
+        end
       end
 
       # SECTION_TEMPLATE (original mustache)
