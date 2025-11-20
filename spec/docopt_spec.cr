@@ -287,7 +287,7 @@ EXPECTED
     fish_completion = Docopt.fish_completion("tool", doc_with_option, custom_completions)
 
     fish_completion.should contain("complete -c tool -l theme -d '--theme='")
-    fish_completion.should contain("complete -c tool -f -n '__fish_seen_subcommand_from tool and __fish_seen_option -l theme' -a 'dark light auto'")
+    fish_completion.should contain("complete -c tool -f -n 'string match -q \"* --theme *\" (commandline)' -a 'dark light auto'")
   end
 
   it "should support custom completions for options with arguments (bash)" do
@@ -342,7 +342,7 @@ EXPECTED
     bash_completion = Docopt.bash_completion("tool", doc_with_short_option, custom_completions)
     zsh_completion = Docopt.zsh_completion("tool", doc_with_short_option, custom_completions)
 
-    fish_completion.should contain("__fish_seen_option -s t")
+    fish_completion.should contain("complete -c tool -f -n 'string match -q \"* -t *\" (commandline)' -a 'dark light auto'")
     fish_completion.should contain("dark light auto")
 
     bash_completion.should contain("-t dark light auto")

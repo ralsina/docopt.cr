@@ -59,11 +59,13 @@ module Docopt
           if option.starts_with?("--")
             # Long option with custom completion
             completions << "complete -c #{command_parts.first} -l #{option_name[2..]} -d '#{description}'"
-            completions << "complete -c #{command_parts.first} -f -n '__fish_seen_subcommand_from #{command_parts.first} and __fish_seen_option -l #{option_name[2..]}' -a '#{custom_completion}'"
+            # Use command line condition that works across fish versions
+            completions << "complete -c #{command_parts.first} -f -n 'string match -q \"* --#{option_name[2..]} *\" (commandline)' -a '#{custom_completion}'"
           elsif option.starts_with?("-") && option.size > 1
             # Short option with custom completion
             completions << "complete -c #{command_parts.first} -s #{option[1]} -d '#{description}'"
-            completions << "complete -c #{command_parts.first} -f -n '__fish_seen_subcommand_from #{command_parts.first} and __fish_seen_option -s #{option[1]}' -a '#{custom_completion}'"
+            # Use command line condition that works across fish versions
+            completions << "complete -c #{command_parts.first} -f -n 'string match -q \"* -#{option[1]} *\" (commandline)' -a '#{custom_completion}'"
           end
         else
           # Regular option without custom completion
