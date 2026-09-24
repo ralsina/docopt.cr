@@ -383,7 +383,7 @@ module Docopt
       @long : (String | Nil) = nil,
       @argcount = 0,
       value = false,
-      @description : String = ""
+      @description : String = "",
     )
       raise "argcount not in [0,1]" if argcount != 0 && argcount != 1
       value = (value == false && argcount > 0) ? nil : value
@@ -638,11 +638,17 @@ module Docopt
     end
   end
 
-  def self.docopt(doc, argv = nil, help = true, version = nil, options_first = false, exit = true) : Hash(String, (Nil | String | Int32 | Bool | Array(String)))
+  alias Result = Hash(String, (Nil | String | Int32 | Bool | Array(String)))
+
+  # Parse a docopt usage text into a `Compiled` pattern that can be
+  # matched against argument vectors any number of times. This is the
+  # expensive half of `docopt`; `match` is the cheap half.
+  #
+  # Raises `DocoptLanguageError` when the text is not valid docopt.
+  def self.parse(doc : String) : Compiled
     # Cleanup color from doc string. Pattern from
     # https://stackoverflow.com/questions/14693701/how-can-i-remove-the-ansi-escape-sequences-from-a-string-in-python
     doc = doc.gsub(/(?:\x1B[@-_]|[\x80-\x9F])[0-?]*[ -\/]*[@-~]/, "")
-    argv = ARGV if argv.nil?
     usage_sections = parse_section("usage:", doc)
     if usage_sections.size == 0
       raise DocoptLanguageError.new "\"usage\": (case-insensitive) not found."
@@ -654,39 +660,81 @@ module Docopt
     DocoptExit.usage = usage
     options = parse_defaults(doc)
     pattern = parse_pattern(formal_usage(usage), options)
-    argv_pat = parse_argv(Tokens.from_array(argv.map { |x| x }), options, options_first)
     pattern_options = pattern.flat Option
     pattern.flat(AnyOptions).each do |options_shortcut|
       options_shortcut_ = options_shortcut.as BranchPattern
       options_shortcut_.children = (options - pattern_options).uniq.map { |x| x.as Pattern }
     end
-    extras(help, version, argv_pat, doc)
-    matched, left, collected = pattern.fix.match(argv_pat)
+    pattern.fix
+    Compiled.new(doc, usage, options, pattern)
+  end
+
+  # Match *argv* against an already parsed usage text. Same behavior as
+  # `docopt`, minus the parsing: on failure, prints the message and the
+  # usage and exits, unless *exit* is false, in which case it raises.
+  def self.match(compiled : Compiled, argv = nil, help = true, version = nil, options_first = false, exit = true) : Result
+    argv = ARGV if argv.nil?
+    DocoptExit.usage = compiled.usage
+    # parse_argv appends unknown options to the list it is given, so
+    # matching must not mutate the compiled pattern's list
+    options = compiled.options.dup
+    argv_pat = parse_argv(Tokens.from_array(argv.map { |x| x }), options, options_first)
+    extras(help, version, argv_pat, compiled.doc)
+    matched, left, collected = compiled.pattern.match(argv_pat)
     if matched && left.size == 0
-      dic = {} of String => (Nil | String | Int32 | Bool | Array(String))
-      (pattern.flat + collected).each do |a|
+      dic = Result.new
+      (compiled.pattern.flat + collected).each do |a|
         if a.is_a? LeafPattern
           name = a.name.as String
           dic[name] = a.value
         end
       end
-      # puts dic
       return dic
     end
     raise DocoptExit.new
   rescue ex
-    if exit
-      msg = ex.message
-      if msg.is_a?(String) && msg.size > 0
-        puts msg
-      end
-      puts DocoptExit.usage
-      Process.exit
-    else
-      raise ex
+    handle_error(ex, exit)
+  end
+
+  def self.docopt(doc, argv = nil, help = true, version = nil, options_first = false, exit = true) : Result
+    match(parse(doc), argv, help, version, options_first, exit)
+  rescue ex
+    handle_error(ex, exit)
+  end
+
+  private def self.handle_error(ex : Exception, exit : Bool) : NoReturn
+    raise ex unless exit
+    msg = ex.message
+    if msg.is_a?(String) && msg.size > 0
+      puts msg
     end
+    puts DocoptExit.usage
+    Process.exit
+  end
+
+  # Parse a docopt usage text at compile time.
+  #
+  # *doc* must be a string literal, or a constant assigned a string
+  # literal. The text is parsed while compiling and the resulting
+  # `Compiled` pattern is embedded in the program as constructor calls,
+  # so at runtime only `match` runs. An invalid usage text is a
+  # compilation error.
+  #
+  # ```
+  # USAGE = <<-DOC
+  #   Usage: prog [-v] <file>
+  #   DOC
+  #
+  # options = Docopt.match(Docopt.compile(USAGE), ARGV)
+  # ```
+  macro compile(doc)
+    {% doc = doc.resolve if doc.is_a?(Path) %}
+    {% raise "Docopt.compile expects a string literal or a constant holding one, got #{doc.class_name}" unless doc.is_a?(StringLiteral) %}
+    {{ run("./docopt/compile_pattern", doc) }}
   end
 end
+
+require "./docopt/compiled"
 
 # Require completion modules
 require "./bash_completion"
