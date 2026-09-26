@@ -33,7 +33,7 @@ module Docopt
         io << "  Docopt::Compiled.new(\n"
         io << "    " << doc.inspect << ",\n"
         io << "    " << usage.inspect << ",\n"
-        io << "    [" << options.map { |o| locals[o.object_id] }.join(", ") << "] of Docopt::Option,\n"
+        io << "    [" << options.map { |option| locals[option.object_id] }.join(", ") << "] of Docopt::Option,\n"
         io << "    "
         Compiled.pattern_to_crystal(pattern, locals, io)
         io << "\n  )\n}).call"

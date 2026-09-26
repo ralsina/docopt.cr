@@ -17,12 +17,12 @@ module Docopt
       @usage = Docopt.parse_section("usage:", @doc)[0]
     end
 
-    def get_completion_path : String
+    def completion_path : String
       "/usr/share/zsh/site-functions"
     end
 
     def get_completion_filepath(cmd : String) : String
-      "#{get_completion_path}/_#{cmd}"
+      "#{completion_path}/_#{cmd}"
     end
 
     def sanitize_name(name : String) : String
@@ -78,7 +78,7 @@ module Docopt
     def create_command_args(subcommands : Hash(String, CommandParams)) : Array(String)
       return [] of String if subcommands.empty?
 
-      args = subcommands.map do |subcommand_name, subcommand_tree|
+      args = subcommands.map do |subcommand_name, _|
         "'#{subcommand_name}:#{subcommand_name}'"
       end
 
@@ -136,11 +136,11 @@ module Docopt
 
       # Main function header
       header = <<-HEADER
-#{function_name}() {
-  local context state line
-  typeset -A opt_args
+        #{function_name}() {
+          local context state line
+          typeset -A opt_args
 
-HEADER
+        HEADER
 
       # Create state machine for subcommands
       state_machine = create_state_machine(cmd_name, param_tree, option_help, function_name)
@@ -171,7 +171,7 @@ HEADER
       lines << "  case $state in"
       lines << "    command)"
 
-      param_tree.subcommands.each do |subcommand_name, subcommand_tree|
+      param_tree.subcommands.each do |subcommand_name, _|
         sub_function_name = "#{function_name}_#{subcommand_name}"
         lines << "      #{subcommand_name})"
         lines << "        #{sub_function_name}"
@@ -257,7 +257,7 @@ HEADER
   def zsh_completion(
     cmd : String,
     help : String,
-    custom_completions = {} of String => String
+    custom_completions = {} of String => String,
   ) : String
     completion = ZshCompletion.new help, custom_completions
     param_tree, option_help = completion.parse_params

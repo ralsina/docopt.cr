@@ -4,26 +4,26 @@ describe "Docopt" do
   # TODO: Write tests
 
   full_doc = <<-DOC
-  Naval Fate.
+    Naval Fate.
 
-  Usage:
-    naval_fate init [-v]...
-    naval_fate ship new <name>...
-    naval_fate ship <name> move <x> <y> [--speed=<kn>]
-    naval_fate ship shoot <x> <y>
-    naval_fate mine (set|remove) <x> <y> [--moored|--drifting]
-    naval_fate save [--files=files...]
-    naval_fate set_speed [--speed=<kn>]
-    naval_fate -h | --help
-    naval_fate --version
+    Usage:
+      naval_fate init [-v]...
+      naval_fate ship new <name>...
+      naval_fate ship <name> move <x> <y> [--speed=<kn>]
+      naval_fate ship shoot <x> <y>
+      naval_fate mine (set|remove) <x> <y> [--moored|--drifting]
+      naval_fate save [--files=files...]
+      naval_fate set_speed [--speed=<kn>]
+      naval_fate -h | --help
+      naval_fate --version
 
-  Options:
-    -h --help        Show this screen.
-    --version        Show version.
-    -s,--speed=<kn>  Speed in knots [default: 10].
-    --moored         Moored (anchored) mine.
-    --drifting       Drifting mine.
-  DOC
+    Options:
+      -h --help        Show this screen.
+      --version        Show version.
+      -s,--speed=<kn>  Speed in knots [default: 10].
+      --moored         Moored (anchored) mine.
+      --drifting       Drifting mine.
+    DOC
 
   # Test helper
   process = ->(argv : Array(String)) {
@@ -31,7 +31,9 @@ describe "Docopt" do
   }
 
   it "should match with subcommands and options" do
-    std = {"ship" => true, "new" => false, "<name>" => ["A"], "move" => true, "<x>" => "a", "<y>" => "b", "--speed" => "3", "shoot" => false, "mine" => false, "set" => false, "remove" => false, "--moored" => nil, "--drifting" => nil, "-h" => nil, "--help" => nil, "--version" => nil}
+    # -h and --help are declared together, so only the long name appears
+    # as a result key, like in the reference implementation.
+    std = {"ship" => true, "new" => false, "<name>" => ["A"], "move" => true, "<x>" => "a", "<y>" => "b", "--speed" => "3", "shoot" => false, "mine" => false, "set" => false, "remove" => false, "--moored" => false, "--drifting" => false, "--help" => false, "--version" => false}
     ans = process.call(["ship", "A", "move", "a", "b", "--speed=3"])
     std.each do |key, value|
       ans[key]?.should eq(value), "the key #{key} does not match the expected"
@@ -89,60 +91,62 @@ describe "Docopt" do
     bash_completion = Docopt::BashCompletion.new full_doc
     param_tree, _ = bash_completion.parse_params
 
-    expected = %(cmds:
-    init:
-         cmds:
-         args: []
-         opts: ["-v"]
+    expected = <<-EXPECTED
+      cmds:
+          init:
+               cmds:
+               args: []
+               opts: ["-v"]
 
-    ship:
-         cmds:
-             new:
-                 cmds:
-                 args: ["<name>"]
-                 opts: []
+          ship:
+               cmds:
+                   new:
+                       cmds:
+                       args: ["<name>"]
+                       opts: []
 
-             move:
-                  cmds:
-                  args: ["<x>", "<y>"]
-                  opts: ["-s=", "--speed="]
+                   move:
+                        cmds:
+                        args: ["<x>", "<y>"]
+                        opts: ["-s=", "--speed="]
 
-             shoot:
-                   cmds:
-                   args: ["<x>", "<y>"]
-                   opts: []
+                   shoot:
+                         cmds:
+                         args: ["<x>", "<y>"]
+                         opts: []
 
-         args: ["<name>"]
-         opts: []
+               args: ["<name>"]
+               opts: []
 
-    mine:
-         cmds:
-             set:
-                 cmds:
-                 args: []
-                 opts: []
+          mine:
+               cmds:
+                   set:
+                       cmds:
+                       args: []
+                       opts: []
 
-             remove:
+                   remove:
+                          cmds:
+                          args: []
+                          opts: []
+
+               args: ["<x>", "<y>"]
+               opts: ["--moored", "--drifting"]
+
+          save:
+               cmds:
+               args: []
+               opts: ["--files="]
+
+          set_speed:
                     cmds:
                     args: []
-                    opts: []
+                    opts: ["-s=", "--speed="]
 
-         args: ["<x>", "<y>"]
-         opts: ["--moored", "--drifting"]
+      args: []
+      opts: ["-h", "--help", "-h", "--help", "--version"]
 
-    save:
-         cmds:
-         args: []
-         opts: ["--files="]
-
-    set_speed:
-              cmds:
-              args: []
-              opts: ["-s=", "--speed="]
-
-args: []
-opts: ["-h", "--help", "-h", "--help", "--version"]
-)
+      EXPECTED
     expected.should eq param_tree.repr
   end
 
@@ -159,16 +163,16 @@ opts: ["-h", "--help", "-h", "--help", "--version"]
 
   it "should insert custom completion commands" do
     expected = <<-EXPECTED
-_x_init()
-{
-    local cur
-    cur="${COMP_WORDS[COMP_CWORD]}"
+      _x_init()
+      {
+          local cur
+          cur="${COMP_WORDS[COMP_CWORD]}"
 
-    if [ $COMP_CWORD -ge 2 ]; then
-        COMPREPLY=( $( compgen -W "$(ls -l /)" -- $cur) )
-    fi
-}
-EXPECTED
+          if [ $COMP_CWORD -ge 2 ]; then
+              COMPREPLY=( $( compgen -W "$(ls -l /)" -- $cur) )
+          fi
+      }
+      EXPECTED
 
     bash_completion = Docopt.bash_completion("x", full_doc, {"x_init" => "$(ls -l /)"})
     bash_completion.should_not be_nil
@@ -274,14 +278,14 @@ EXPECTED
   # Custom option completion tests
   it "should support custom completions for options with arguments (fish)" do
     doc_with_option = <<-DOC
-    Tool with custom option completion.
+      Tool with custom option completion.
 
-    Usage:
-      tool [--theme=<theme>]
+      Usage:
+        tool [--theme=<theme>]
 
-    Options:
-      --theme=<theme>  Set the theme [default: auto].
-    DOC
+      Options:
+        --theme=<theme>  Set the theme [default: auto].
+      DOC
 
     custom_completions = {"--theme" => "dark light auto"}
     fish_completion = Docopt.fish_completion("tool", doc_with_option, custom_completions)
@@ -292,14 +296,14 @@ EXPECTED
 
   it "should support custom completions for options with arguments (bash)" do
     doc_with_option = <<-DOC
-    Tool with custom option completion.
+      Tool with custom option completion.
 
-    Usage:
-      tool [--theme=<theme>]
+      Usage:
+        tool [--theme=<theme>]
 
-    Options:
-      --theme=<theme>  Set the theme [default: auto].
-    DOC
+      Options:
+        --theme=<theme>  Set the theme [default: auto].
+      DOC
 
     custom_completions = {"--theme" => "dark light auto"}
     bash_completion = Docopt.bash_completion("tool", doc_with_option, custom_completions)
@@ -309,14 +313,14 @@ EXPECTED
 
   it "should support custom completions for options with arguments (zsh)" do
     doc_with_option = <<-DOC
-    Tool with custom option completion.
+      Tool with custom option completion.
 
-    Usage:
-      tool [--theme=<theme>]
+      Usage:
+        tool [--theme=<theme>]
 
-    Options:
-      --theme=<theme>  Set the theme [default: auto].
-    DOC
+      Options:
+        --theme=<theme>  Set the theme [default: auto].
+      DOC
 
     custom_completions = {"--theme" => "dark light auto"}
     zsh_completion = Docopt.zsh_completion("tool", doc_with_option, custom_completions)
@@ -326,14 +330,14 @@ EXPECTED
 
   it "should support custom completions for short options with arguments" do
     doc_with_short_option = <<-DOC
-    Tool with custom short option completion.
+      Tool with custom short option completion.
 
-    Usage:
-      tool [-t=<theme>]
+      Usage:
+        tool [-t=<theme>]
 
-    Options:
-      -t=<theme>  Set the theme [default: auto].
-    DOC
+      Options:
+        -t=<theme>  Set the theme [default: auto].
+      DOC
 
     custom_completions = {"-t" => "dark light auto"}
 
@@ -352,14 +356,14 @@ EXPECTED
 
   it "should not apply custom completions to options without arguments" do
     doc_with_no_arg_option = <<-DOC
-    Tool with boolean option.
+      Tool with boolean option.
 
-    Usage:
-      tool [--verbose]
+      Usage:
+        tool [--verbose]
 
-    Options:
-      --verbose  Enable verbose output.
-    DOC
+      Options:
+        --verbose  Enable verbose output.
+      DOC
 
     custom_completions = {"--verbose" => "should not appear"}
     fish_completion = Docopt.fish_completion("tool", doc_with_no_arg_option, custom_completions)
@@ -371,16 +375,16 @@ EXPECTED
 
   it "should support mixed option custom completions" do
     doc_with_mixed_options = <<-DOC
-    Tool with mixed options.
+      Tool with mixed options.
 
-    Usage:
-      tool [--theme=<theme>] [--verbose] [--template=<template>]
+      Usage:
+        tool [--theme=<theme>] [--verbose] [--template=<template>]
 
-    Options:
-      --theme=<theme>    Set the theme [default: auto].
-      --verbose          Enable verbose output.
-      --template=<template>  Set the template [default: basic].
-    DOC
+      Options:
+        --theme=<theme>    Set the theme [default: auto].
+        --verbose          Enable verbose output.
+        --template=<template>  Set the template [default: basic].
+      DOC
 
     custom_completions = {
       "--theme"    => "dark light auto",

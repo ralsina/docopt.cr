@@ -75,12 +75,12 @@ module Docopt
       @usage = Docopt.parse_section("usage:", @doc)[0]
     end
 
-    def get_completion_path : String
+    def completion_path : String
       "/etc/bash_completion.d"
     end
 
     def get_completion_filepath(cmd : String) : String
-      completion_path = get_completion_path
+      completion_path = self.completion_path
       "#{completion_path}/#{cmd}.sh"
     end
 
@@ -92,11 +92,9 @@ module Docopt
       #     {0})
       #     _{1}_{0}
       # ;;
-      subcommand_cases = subcommands.map { |subcommand|
-        "            #{subcommand})
-            _#{cmd_name}_#{subcommand}
-        ;;"
-      }.join("\n")
+      subcommand_cases = subcommands.map do |subcommand|
+        "            #{subcommand})\n            _#{cmd_name}_#{subcommand}\n        ;;"
+      end.join("\n")
 
       # SUBCOMMAND_SWITCH_TEMPLATE. Original mustache:
       #     else
@@ -104,11 +102,11 @@ module Docopt
       # {subcommand_cases}
       #     esac
       <<-TMPL
-    else
-        case ${COMP_WORDS[#{level_num}]} in
-#{subcommand_cases}
-        esac
-TMPL
+            else
+                case ${COMP_WORDS[#{level_num}]} in
+        #{subcommand_cases}
+                esac
+        TMPL
     end
 
     def create_compreply(param_tree : CommandParams) : String
@@ -188,16 +186,16 @@ TMPL
 
       res = <<-TMPL
 
-_#{cmd_name}()
-{
-    local cur
-    cur="${COMP_WORDS[COMP_CWORD]}"
+        _#{cmd_name}()
+        {
+            local cur
+            cur="${COMP_WORDS[COMP_CWORD]}"
 
-    if [ $COMP_CWORD -#{op} #{level_num} ]; then
-        COMPREPLY=( $( compgen #{compreply} -- $cur) )#{subcommand_switch}
-    fi
-}
-TMPL
+            if [ $COMP_CWORD -#{op} #{level_num} ]; then
+                COMPREPLY=( $( compgen #{compreply} -- $cur) )#{subcommand_switch}
+            fi
+        }
+        TMPL
 
       subcommands.each do |subcommand_name, subcommand_tree|
         res += create_section("#{cmd_name}_#{subcommand_name}", subcommand_tree, option_help, level_num + 1)
@@ -220,9 +218,10 @@ TMPL
       #
       #  {0}\ncomplete -o bashdefault -o default -o filenames -F _{1} {2}
 
-      %(#{completion_file_inner_content}
-complete -o bashdefault -o default -o filenames -F _#{sanitize_name(cmd)} #{cmd}
-)
+      <<-FILE_TEMPLATE
+        #{completion_file_inner_content}
+        complete -o bashdefault -o default -o filenames -F _#{sanitize_name(cmd)} #{cmd}
+        FILE_TEMPLATE
     end
 
     def parse_params : Tuple(CommandParams, Hash(String, String))
@@ -280,7 +279,7 @@ complete -o bashdefault -o default -o filenames -F _#{sanitize_name(cmd)} #{cmd}
   def bash_completion(
     cmd : String,
     help : String,
-    custom_completions = {} of String => String
+    custom_completions = {} of String => String,
   ) : String
     completion = BashCompletion.new help, custom_completions
     param_tree, option_help = completion.parse_params

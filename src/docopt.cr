@@ -35,8 +35,12 @@ module Docopt
 
     def self.from_pattern(source : String) : Tokens
       ret = Tokens.new(DocoptExit)
-      source.gsub(/([\[\]\(\)\|]|\.\.\.)/) { |_, m| " #{m[1]} " }.split.each do |tok|
-        ret << tok
+      source = source.gsub(/([\[\]\(\)\|]|\.\.\.)/) { |_, m| " #{m[1]} " }
+      # Whitespace-separated words, except that a word running into a
+      # "<...>" group ("<input file>", "--input=<file name>") is one
+      # token, like the reference tokenizer's \s+|(\S*<.*?>) split.
+      source.scan(/(\S*<.*?>)|\S+/).each do |match|
+        ret << match[0]
       end
       ret.error = DocoptLanguageError
       ret
@@ -50,11 +54,11 @@ module Docopt
       ret
     end
 
-    def move : String | Nil
+    def move : String?
       size > 0 ? delete_at(0) : nil
     end
 
-    def current : String | Nil
+    def current : String?
       size > 0 ? self[0] : nil
     end
   end
@@ -63,7 +67,7 @@ module Docopt
     getter :children
 
     def initialize
-      @children = nil.as(Array(Pattern) | Nil)
+      @children = nil.as(Array(Pattern)?)
     end
 
     def ==(other : Pattern) : Bool
@@ -162,7 +166,7 @@ module Docopt
 
     abstract def flat(*types)
 
-    abstract def match(left : Array(Pattern), collected : (Nil | Array(Pattern)) = nil) : Tuple(Bool, Array(Pattern), Array(Pattern))
+    abstract def match(left : Array(Pattern), collected : Array(Pattern)? = nil) : Tuple(Bool, Array(Pattern), Array(Pattern))
     #  return false, left, ([] of Pattern)
     # end
   end
@@ -170,11 +174,11 @@ module Docopt
   abstract class LeafPattern < Pattern
     getter :name
     property :value
-    @name : (String | Nil)
-    @value : (Nil | String | Int32 | Bool | Array(String))
+    @name : String?
+    @value : (String | Int32 | Bool | Array(String))?
 
     def initialize(@name, @value = nil)
-      @children = nil.as(Array(Pattern) | Nil)
+      @children = nil.as(Array(Pattern)?)
     end
 
     def to_s
@@ -188,7 +192,7 @@ module Docopt
       [] of Pattern
     end
 
-    def match(left : Array(Pattern), collected : (Nil | Array(Pattern)) = nil) : Tuple(Bool, Array(Pattern), Array(Pattern))
+    def match(left : Array(Pattern), collected : Array(Pattern)? = nil) : Tuple(Bool, Array(Pattern), Array(Pattern))
       # def match(left, collected = nil)
       # @TODO
       collected = [] of Pattern if collected.nil?
@@ -258,7 +262,7 @@ module Docopt
   end
 
   class Required < BranchPattern
-    def match(left : Array(Pattern), collected : (Nil | Array(Pattern)) = nil) : Tuple(Bool, Array(Pattern), Array(Pattern))
+    def match(left : Array(Pattern), collected : Array(Pattern)? = nil) : Tuple(Bool, Array(Pattern), Array(Pattern))
       # def match(left, collected = nil)
       collected = [] of Pattern if collected.nil?
       l = left
@@ -275,7 +279,7 @@ module Docopt
   end
 
   class Optional < BranchPattern
-    def match(left : Array(Pattern), collected : (Nil | Array(Pattern)) = nil) : Tuple(Bool, Array(Pattern), Array(Pattern))
+    def match(left : Array(Pattern), collected : Array(Pattern)? = nil) : Tuple(Bool, Array(Pattern), Array(Pattern))
       # def match(left, collected = nil)
       collected = [] of Pattern if collected.nil?
       ch = @children.as Array(Pattern)
@@ -304,7 +308,7 @@ module Docopt
       m = source.match(/\[default: (.*)\]/i)
       value = nil
       if m
-        value = m[0]
+        value = m[1]
       end
       typeof(self).new name, value
     end
@@ -330,7 +334,7 @@ module Docopt
   end
 
   class OneOrMore < BranchPattern
-    def match(left : Array(Pattern), collected : (Nil | Array(Pattern)) = nil) : Tuple(Bool, Array(Pattern), Array(Pattern))
+    def match(left : Array(Pattern), collected : Array(Pattern)? = nil) : Tuple(Bool, Array(Pattern), Array(Pattern))
       # def match(left, collected = nil)
       ch = @children.as Array(Pattern)
       raise "#{ch}.size != 1" if ch.size != 1
@@ -356,7 +360,7 @@ module Docopt
   end
 
   class Either < BranchPattern
-    def match(left : Array(Pattern), collected : (Nil | Array(Pattern)) = nil) : Tuple(Bool, Array(Pattern), Array(Pattern))
+    def match(left : Array(Pattern), collected : Array(Pattern)? = nil) : Tuple(Bool, Array(Pattern), Array(Pattern))
       # def match(left, collected = nil)
       collected = [] of Pattern if collected.nil?
       outcomes = [] of Tuple(Bool, Array(Pattern), Array(Pattern))
@@ -379,8 +383,8 @@ module Docopt
     property :value
 
     def initialize(
-      @short : (String | Nil) = nil,
-      @long : (String | Nil) = nil,
+      @short : String? = nil,
+      @long : String? = nil,
       @argcount = 0,
       value = false,
       @description : String = "",
@@ -399,7 +403,7 @@ module Docopt
 
     def self.parse(option_description)
       short, long, argcount, value = nil, nil, 0, false
-      options, description = option_description.strip.split("  ", limit: 2)
+      options, _, description = option_description.strip.partition("  ")
       options = options.gsub(',', ' ').gsub('=', ' ')
       options.split.each do |tok|
         if tok.starts_with? "--"
@@ -410,9 +414,9 @@ module Docopt
           argcount = 1
         end
       end
-      if argcount
-        if description =~ /\[default: (.*)\]/i
-          value = $1
+      if argcount > 0
+        if m = description.match(/\[default: (.*)\]/i)
+          value = m[1]
         else
           value = nil
         end
@@ -447,8 +451,11 @@ module Docopt
     parse_section("options:", doc).each do |s|
       _, s = s.split(':', limit: 2)
       split = ("\n" + s).split /\n[ \t]*(-\S+?)/
-      split = split[1, split.size]
+      split = split[1..]
       split.each_slice(2) do |x|
+        # A dangling option marker with no description (Python pairs
+        # with zip, which drops the tail) is skipped.
+        next if x.size < 2
         s = x[0] + x[1]
         if s.starts_with? "-"
           defaults << Option.parse s
@@ -461,7 +468,7 @@ module Docopt
   def self.formal_usage(section)
     _, section = section.split(":", limit: 2)
     pu = section.split
-    "(" + pu[1, pu.size].map { |x| x == pu[0] ? ") | (" : x }.join(" ") + ")"
+    "( " + pu[1, pu.size].map { |x| x == pu[0] ? ") | (" : x }.join(" ") + " )"
   end
 
   def self.parse_long(tokens, options) : Array(Pattern)
@@ -472,7 +479,7 @@ module Docopt
     value = long_value.size <= 1 ? nil : long_value[1]
     similar = options.select { |o| o.long == long }
     if tokens.error == DocoptExit && similar.size == 0
-      similar = options.select { |o| (o.long.as String).starts_with? long }
+      similar = options.select { |o| o.long.try &.starts_with?(long) }
     end
     if similar.size > 1
       raise tokens.error.new "#{long} is not a uniq prefix: #{similar.map(&.long).join(", ")}?"
@@ -545,12 +552,12 @@ module Docopt
     when "("
       tokens.move
       result = Required.new parse_expr(tokens, options)
-      raise "unmatched #{token}" if tokens.move != ")"
+      raise tokens.error.new "unmatched #{token}" if tokens.move != ")"
       [result.as Pattern]
     when "["
       tokens.move
       result = Optional.new parse_expr(tokens, options)
-      raise "unmatched #{token}" if tokens.move != "]"
+      raise tokens.error.new "unmatched #{token}" if tokens.move != "]"
       [result.as Pattern]
     when "options"
       tokens.move
@@ -560,12 +567,19 @@ module Docopt
         parse_long(tokens, options)
       elsif token.starts_with?("-") && token != "--" && token != "-"
         parse_shorts(tokens, options)
-      elsif token.starts_with?("<") && token.ends_with?(">") || token == token.upcase
+      elsif token.starts_with?("<") && token.ends_with?(">") || uppercased_token?(token)
         [Argument.new(tokens.move).as Pattern]
       else
         [Command.new(tokens.move).as Pattern]
       end
     end
+  end
+
+  # Python's str.isupper: true when every cased character is uppercase
+  # and there is at least one cased character. Tokens without letters
+  # ("-", "123") are therefore commands, not arguments.
+  private def self.uppercased_token?(token : String) : Bool
+    token == token.upcase && token.chars.any?(&.uppercase?)
   end
 
   def self.parse_seq(tokens, options) : Array(Pattern)
@@ -599,7 +613,7 @@ module Docopt
   def self.parse_pattern(source, options)
     tokens = Tokens.from_pattern(source)
     result = parse_expr(tokens, options)
-    raise "Unexpected ending: #{tokens.join " "}" if !tokens.current.nil?
+    raise DocoptLanguageError.new("Unexpected ending: #{tokens.join " "}") if !tokens.current.nil?
     Required.new(result)
   end
 
@@ -638,7 +652,7 @@ module Docopt
     end
   end
 
-  alias Result = Hash(String, (Nil | String | Int32 | Bool | Array(String)))
+  alias Result = Hash(String, (String | Int32 | Bool | Array(String))?)
 
   # Parse a docopt usage text into a `Compiled` pattern that can be
   # matched against argument vectors any number of times. This is the

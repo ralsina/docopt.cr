@@ -17,12 +17,12 @@ module Docopt
       @usage = Docopt.parse_section("usage:", @doc)[0]
     end
 
-    def get_completion_path : String
+    def completion_path : String
       "~/.config/fish/completions"
     end
 
     def get_completion_filepath(cmd : String) : String
-      "#{get_completion_path}/#{cmd}.fish"
+      "#{completion_path}/#{cmd}.fish"
     end
 
     def sanitize_name(name : String) : String
@@ -46,7 +46,6 @@ module Docopt
       return "" if options.empty?
 
       completions = [] of String
-      condition = create_completion_condition(command_parts)
 
       options.each do |option|
         description = option_help[option]? || option
@@ -88,7 +87,7 @@ module Docopt
       completions = [] of String
       condition = create_completion_condition(command_parts)
 
-      subcommands.each do |subcommand_name, subcommand_tree|
+      subcommands.each do |subcommand_name, _|
         completions << "complete -c #{command_parts.first} -f -n '#{condition}' -a #{subcommand_name} -d '#{subcommand_name}'"
       end
 
@@ -121,7 +120,6 @@ module Docopt
         # Recursively create completions for subcommands
         param_tree.subcommands.each do |subcommand_name, subcommand_tree|
           new_command_parts = current_command_parts + [subcommand_name]
-          custom_name = new_command_parts.join("_")
           result << create_section(cmd_name, subcommand_tree, option_help, new_command_parts)
         end
       end
@@ -200,7 +198,7 @@ module Docopt
   def fish_completion(
     cmd : String,
     help : String,
-    custom_completions = {} of String => String
+    custom_completions = {} of String => String,
   ) : String
     completion = FishCompletion.new help, custom_completions
     param_tree, option_help = completion.parse_params
