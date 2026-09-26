@@ -24,13 +24,15 @@ NAVAL_FATE = <<-DOC
 NAVAL_COMPILED = Docopt.compile(NAVAL_FATE)
 
 # A literal works too
-LITERAL_COMPILED = Docopt.compile(<<-DOC)
+LITERAL_DOC = <<-DOC
   Usage: prog [-v] [--count=<n>] <file>...
 
   Options:
     -v            Verbose.
     --count=<n>   How many [default: 3].
   DOC
+
+LITERAL_COMPILED = Docopt.compile(LITERAL_DOC)
 
 NAVAL_ARGVS = [
   ["ship", "A", "move", "a", "b", "--speed=3"],
@@ -108,5 +110,99 @@ describe "Docopt.compile" do
     # The generated source must be stable: serializing the compiled
     # pattern again yields the same code
     Docopt.parse(NAVAL_FATE).to_crystal.should eq NAVAL_COMPILED.to_crystal
+  end
+end
+
+describe "Compiled#defaults" do
+  it "maps every declared option to its absent-from-argv value" do
+    defaults = Docopt.parse(NAVAL_FATE).defaults
+    defaults["--speed"].should eq "10"
+    defaults["--moored"].should be_false
+    defaults["--drifting"].should be_false
+    defaults["--help"].should be_false
+    defaults["--version"].should be_false
+  end
+
+  it "keeps array defaults of repeated options" do
+    doc = <<-DOC
+      Usage: prog [--data=<data>...]
+
+      Options:
+        -d --data=<arg>  Input data [default: x y].
+      DOC
+    Docopt.parse(doc).defaults["--data"].should eq ["x", "y"]
+  end
+
+  it "is nil for options without a declared default" do
+    defaults = Docopt.parse(LITERAL_DOC).defaults
+    defaults["--count"].should eq "3"
+    defaults["-v"].should be_false
+  end
+end
+
+describe "Compiled#without_defaults" do
+  defaults_doc = <<-DOC
+    Usage: prog [-v] [--speed=<kn>] [--data=<d>...] <file>
+
+    Options:
+      -v            Verbose.
+      --speed=<kn>  Speed [default: 10].
+      --data=<d>    Data [default: x].
+    DOC
+
+  it "parses absent options as not-provided instead of their defaults" do
+    stripped = Docopt.parse(defaults_doc).without_defaults
+    result = Docopt.match(stripped, ["f.txt"], help: false, exit: false)
+    result["--speed"].should be_nil
+    result["--data"].should eq [] of String
+    result["-v"].should be_false
+    result["<file>"].should eq "f.txt"
+  end
+
+  it "is equivalent to matching a doc with the defaults stripped" do
+    doc_without_defaults = defaults_doc.gsub(/\s*\[default:\s*([^\]]+)\]/i, "")
+    compiled = Docopt.parse(defaults_doc)
+    argvs = [
+      ["f.txt"],
+      ["-v", "f.txt"],
+      ["--speed=5", "f.txt"],
+      ["--data=a", "--data=b", "f.txt"],
+      ["-v", "--speed=5", "--data=a", "f.txt"],
+    ]
+    argvs.each do |argv|
+      stripped_match = Docopt.match(compiled.without_defaults, argv, help: false, exit: false)
+      reference_match = Docopt.docopt(doc_without_defaults, argv, help: false, exit: false)
+      stripped_match.should eq reference_match
+    end
+  end
+
+  it "leaves the original pattern untouched" do
+    compiled = Docopt.parse(defaults_doc)
+    options_before = compiled.options.map(&.to_s)
+    pattern_before = compiled.pattern.to_s
+
+    Docopt.match(compiled.without_defaults, ["f.txt"], help: false, exit: false)
+    Docopt.match(compiled, ["f.txt"], help: false, exit: false)
+
+    compiled.options.map(&.to_s).should eq options_before
+    compiled.pattern.to_s.should eq pattern_before
+    Docopt.match(compiled, ["f.txt"], help: false, exit: false)["--speed"].should eq "10"
+  end
+
+  it "keeps equal leaves as one shared object" do
+    copy = Docopt.parse(NAVAL_FATE).without_defaults
+    xs = copy.pattern.flat.select { |leaf| leaf.is_a?(Docopt::Argument) && leaf.name == "<x>" }
+    xs.size.should be > 1
+    xs.map(&.object_id).uniq!.size.should eq 1
+  end
+
+  it "agrees with the original on values that are not declared defaults" do
+    copy = Docopt.parse(NAVAL_FATE).without_defaults
+    copy.options.size.should eq Docopt.parse(NAVAL_FATE).options.size
+    copy.options.map(&.name.to_s).sort!.should eq Docopt.parse(NAVAL_FATE).options.map(&.name.to_s).sort!
+    # Flags keep their absent value in both
+    if flag = copy.options.find { |option| option.name == "--moored" }
+      flag.value.should be_false
+    end
   end
 end

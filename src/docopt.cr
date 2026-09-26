@@ -680,7 +680,23 @@ module Docopt
       options_shortcut_.children = (options - pattern_options).uniq.map { |x| x.as Pattern }
     end
     pattern.fix
+    sync_option_values(options, pattern)
     Compiled.new(doc, usage, options, pattern)
+  end
+
+  # The options list and the pattern tree hold separate Option objects
+  # (the tree gets copies while parsing), and only the tree is adjusted
+  # by fix (repeated options accumulate, declared defaults become
+  # arrays). Copy the adjusted values back onto the declared options so
+  # both views of a Compiled pattern agree.
+  private def self.sync_option_values(options : Array(Option), pattern : Pattern) : Nil
+    leaves = pattern.flat Option
+    options.each do |option|
+      if name = option.name
+        leaf = leaves.find { |candidate| candidate.is_a?(Option) && candidate.name == name }
+        option.value = leaf.as(Option).value if leaf
+      end
+    end
   end
 
   # Match *argv* against an already parsed usage text. Same behavior as
@@ -707,7 +723,10 @@ module Docopt
     end
     raise DocoptExit.new
   rescue ex
-    handle_error(ex, exit)
+    # The usage to print comes from the pattern being matched, not
+    # from the DocoptExit.usage global (kept in sync above for
+    # callers that still read it).
+    handle_error(ex, exit, compiled.usage)
   end
 
   def self.docopt(doc, argv = nil, help = true, version = nil, options_first = false, exit = true) : Result
@@ -716,13 +735,14 @@ module Docopt
     handle_error(ex, exit)
   end
 
-  private def self.handle_error(ex : Exception, exit : Bool) : NoReturn
+  private def self.handle_error(ex : Exception, exit : Bool, usage : String? = nil) : NoReturn
     raise ex unless exit
+    usage = DocoptExit.usage if usage.nil?
     msg = ex.message
     if msg.is_a?(String) && msg.size > 0
       puts msg
     end
-    puts DocoptExit.usage
+    puts usage if usage && !usage.empty?
     Process.exit
   end
 

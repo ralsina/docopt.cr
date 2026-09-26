@@ -107,6 +107,24 @@ The two halves are also available at runtime as `Docopt.parse(doc)`,
 which returns a `Docopt::Compiled`, and `Docopt.match(compiled, argv)`,
 for programs that match many argument vectors against one usage text.
 
+A `Compiled` pattern also exposes what the doc declares, so layered
+tools (configuration files, environment variables, subcommand
+dispatchers) never need to re-parse the doc:
+
+- `compiled.defaults` — the value every declared option parses to when
+  absent from argv: its `[default: ...]` value (an array for repeated
+  options), `false` for flags, `nil` otherwise.
+- `compiled.without_defaults` — a copy of the pattern with declared
+  defaults neutralized, so matching tells "given on the command line"
+  apart from "fell back to the default". Equivalent to matching the
+  same doc with the `[default: ...]` annotations stripped.
+
+```crystal
+compiled = Docopt.parse(USAGE)
+given = Docopt.match(compiled.without_defaults, ARGV, exit: false)
+speed = given["--speed"]? || compiled.defaults["--speed"]
+```
+
 ## Shell Completion Generation
 
 docopt.cr can generate shell completion scripts for bash, fish, and zsh
