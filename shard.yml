@@ -12,3 +12,7 @@ crystal: '>= 1.13.0'
 targets:
   naval_fate:
     main: examples/naval_fate.cr
+
+development_dependencies:
+  ameba:
+    github: crystal-ameba/ameba
