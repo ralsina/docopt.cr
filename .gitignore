@@ -2,9 +2,11 @@
 /libs/
 /.crystal/
 /.shards/
+/bin/
 
+# Editor / agent local state
+.claude/
 
 # Libraries don't need dependency lock
-# Dependencies will be locked in application that uses them
+# Dependencies will be locked in application that use them
 /shard.lock
-
