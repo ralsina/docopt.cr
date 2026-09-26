@@ -1,4 +1,4 @@
-require "./docopt"
+require "./completion"
 
 # This code is a strightforward port of infi.dot_completion and
 # this is the original license.
@@ -22,8 +22,8 @@ require "./docopt"
 # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
 # ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
 # WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
+# ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
 # DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
 # SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
 # CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
@@ -33,246 +33,146 @@ require "./docopt"
 module Docopt
   extend self
 
-  class CommandParams
-    # Contains command options, arguments and subcommands.
-    #
-    # Options are optional arguments like "-v", "-h", etc.
-    #
-    # Arguments are required arguments like file paths, etc.
-    #
-    # Subcommands are optional keywords, like the "status" in "git status".
-    # Subcommands have their own CommandParams instance, so the "status" in "git status" can
-    # have its own options, arguments and subcommands.
-    #
-    # This way, we can describe commands like "git remote add origin --fetch" with all the different
-    # options at each level.
-
-    property arguments : Array(String) = [] of String
-    property options : Array(String) = [] of String
-    property subcommands : Hash(String, CommandParams) = Hash(String, CommandParams).new
-
-    def get_subcommand(subcommand : String) : CommandParams
-      subcommands[subcommand] ||= CommandParams.new
-    end
-
-    def repr(indent : Int32 = 0) : String
-      s = " " * indent + "cmds:\n"
-      subcommands.each do |cmd, subcommand|
-        s += " " * (indent + 4) + "#{cmd}:\n#{subcommand.repr(indent + 5 + cmd.size)}\n"
-      end
-      s += " " * indent + "args: #{arguments}\n"
-      s += " " * indent + "opts: #{options}\n"
-      s
-    end
-  end
-
-  class BashCompletion
-    @doc : String
-    @usage : String
-    @custom_completions : Hash(String, String)
-
-    def initialize(@doc, @custom_completions = {} of String => String)
-      @usage = Docopt.parse_section("usage:", @doc)[0]
-    end
-
+  class BashCompletion < Completion
     def completion_path : String
       "/etc/bash_completion.d"
     end
 
     def get_completion_filepath(cmd : String) : String
-      completion_path = self.completion_path
       "#{completion_path}/#{cmd}.sh"
     end
 
-    def create_subcommand_switch(cmd_name : String, level_num : Int32, subcommands : Array(String), opts : Array(String)) : String
-      return "" if subcommands.empty?
-
-      # CASE_TEMPLATE original mustache:
-      #
-      #     {0})
-      #     _{1}_{0}
-      # ;;
-      subcommand_cases = subcommands.map do |subcommand|
-        "            #{subcommand})\n            _#{cmd_name}_#{subcommand}\n        ;;"
-      end.join("\n")
-
-      # SUBCOMMAND_SWITCH_TEMPLATE. Original mustache:
-      #     else
-      #         case ${{COMP_WORDS[{level_num}]}} in
-      # {subcommand_cases}
-      #     esac
-      <<-TMPL
-            else
-                case ${COMP_WORDS[#{level_num}]} in
-        #{subcommand_cases}
-                esac
-        TMPL
+    # Some bash versions don't support ".", "-", etc. in function
+    # names; drop them (underscores are kept).
+    def sanitize_name(name : String) : String
+      name.chars.select { |char| char.ascii_alphanumeric? || char == '_' }.join
     end
 
-    def create_compreply(param_tree : CommandParams) : String
-      # Add -f (show files in completion options) if there are arguments in the current section
-      # In this case, there are (usually) no subcommands to suggest, and only flags, so it's ok to suggest files.
-      # If the user types "-" first, then only the flags will be suggested.
-      flag = param_tree.arguments.size > 0 ? "-fW" : "-W"
-      word_list = (param_tree.options + param_tree.subcommands.keys).join(" ")
-      "#{flag} '#{word_list}'"
-    end
-
-    def create_option_compreply(param_tree : CommandParams) : String
-      return "" if param_tree.options.empty?
-
-      completions = [] of String
-
-      param_tree.options.each do |option|
-        option_name = option.chomp("=")
-
-        # Check if this option takes arguments and has custom completions
-        if option.ends_with?("=") && @custom_completions.has_key?(option_name)
-          custom_completion = @custom_completions[option_name]
-          if option.starts_with?("--")
-            # Long option with custom completion
-            completions << "--#{option_name[2..]}=#{custom_completion}"
-          elsif option.starts_with?("-") && option.size > 1
-            # Short option with custom completion
-            completions << "-#{option[1]} #{custom_completion}"
-          end
-        else
-          # Regular option without custom completion
-          if option.starts_with?("--")
-            completions << "--#{option[2..]}"
-          elsif option.starts_with?("-") && option.size > 1
-            completions << "-#{option[1]}"
-          end
-        end
-      end
-
-      if completions.empty?
-        ""
+    # The compgen arguments completing the words valid at this node:
+    # the declared options and the subcommands, plus files when the
+    # node takes positional arguments. A custom completion for the
+    # whole node replaces the list, like in the original port.
+    private def compreply_for(cmd_name : String, param_tree : CommandParams) : String
+      if custom = @custom_completions[cmd_name]?
+        "-W \"#{custom}\""
       else
-        "-W '#{completions.join(" ")}'"
+        flag = param_tree.arguments.size > 0 ? "-fW" : "-W"
+        word_list = (param_tree.option_specs.flat_map(&.words) + param_tree.subcommands.keys).join(" ")
+        "#{flag} '#{word_list}'"
       end
+    end
+
+    # Cases completing the value of options that take one, based on
+    # the word being completed: "--opt=<TAB>" offers every
+    # "opt=value" for word-list customs.
+    private def create_attached_value_cases(param_tree : CommandParams) : String
+      cases = [] of String
+      param_tree.option_specs.each do |spec|
+        next unless spec.takes_value?
+        next if (custom = custom_for(spec)).nil? || custom.includes?("$(")
+        long_name = spec.long
+        next if long_name.nil?
+        attached = custom.split.map { |word| "#{long_name}=#{word}" }.join(" ")
+        cases << <<-CASE
+              case $cur in
+                  #{long_name}=*)
+                      COMPREPLY=( $( compgen -W '#{attached}' -- $cur) )
+                      return 0
+                      ;;
+              esac
+
+          CASE
+      end
+      cases.join
+    end
+
+    # Cases completing the value of options that take one, based on
+    # the previous word: "--opt <TAB>" (or "-o <TAB>") offers the
+    # custom words, or files when there is no custom completion.
+    private def create_previous_value_cases(param_tree : CommandParams) : String
+      cases = [] of String
+      param_tree.option_specs.each do |spec|
+        next unless spec.takes_value?
+        labels = [spec.long, spec.short].compact
+        next if labels.empty?
+        completion = if custom = custom_for(spec)
+                       "compgen -W \"#{custom}\" -- $cur"
+                     else
+                       "compgen -f -- $cur"
+                     end
+        cases << <<-CASE
+                  #{labels.join("|")})
+                      COMPREPLY=( $( #{completion}) )
+                      return 0
+                      ;;
+          CASE
+      end
+      return "" if cases.empty?
+      <<-CASE
+        case $prev in
+        #{cases.join}        esac
+
+        CASE
+    end
+
+    # The else branch for nodes with subcommands: walk the words
+    # already on the line and hand over to the deepest subcommand
+    # function that matches, so subcommands are still found when
+    # positional arguments sit between them ("prog <name> move ...").
+    # With no match, complete as if still at this node.
+    private def create_subcommand_dispatch(cmd_name : String, level_num : Int32, subcommands : Array(String), compreply : String) : String
+      return "" if subcommands.empty?
+      cases = subcommands.map do |subcommand|
+        "                #{subcommand}) next=\"_#{cmd_name}_#{subcommand}\" ;;"
+      end.join("\n")
+      <<-DISPATCH
+        else
+            local next="" word
+            for word in "${COMP_WORDS[@]:#{level_num}:$((COMP_CWORD-#{level_num}))}"; do
+                case $word in
+        #{cases}
+                esac
+            done
+            if [ -n "$next" ]; then
+                $next
+            else
+                COMPREPLY=( $( compgen #{compreply} -- $cur) )
+            fi
+        DISPATCH
     end
 
     def create_section(cmd_name : String, param_tree : CommandParams, option_help : Hash(String, String), level_num : Int32) : String
       subcommands = param_tree.subcommands
-      opts = param_tree.options
-      subcommand_switch = create_subcommand_switch(cmd_name, level_num, subcommands.keys, opts)
+      compreply = compreply_for(cmd_name, param_tree)
+      dispatch = create_subcommand_dispatch(cmd_name, level_num, subcommands.keys, compreply)
       op = subcommands.empty? ? "ge" : "eq"
 
-      # Check for custom completions (both command-level and option-level)
-      if @custom_completions.keys.includes? cmd_name
-        compreply = "-W \"#{@custom_completions[cmd_name]}\""
-      else
-        # Check if we have custom option completions
-        option_compreply = create_option_compreply(param_tree)
-        if option_compreply.empty?
-          compreply = create_compreply(param_tree)
-        else
-          compreply = option_compreply
-        end
+      section = String.build do |io|
+        io << "\n"
+        io << "_#{cmd_name}()\n"
+        io << "{\n"
+        io << "    local cur prev\n"
+        io << "    cur=\"${COMP_WORDS[COMP_CWORD]}\"\n"
+        io << "    prev=\"${COMP_WORDS[COMP_CWORD-1]}\"\n"
+        io << "\n"
+        io << create_attached_value_cases(param_tree)
+        io << create_previous_value_cases(param_tree)
+        io << "    if [ $COMP_CWORD -#{op} #{level_num} ]; then\n"
+        io << "        COMPREPLY=( $( compgen #{compreply} -- $cur) )\n"
+        io << dispatch
+        io << "    fi\n"
+        io << "}\n"
       end
-
-      # SECTION_TEMPLATE (original mustache)
-      #
-      # _{cmd_name}()
-      # {{
-      #     local cur
-      #     cur="${{COMP_WORDS[COMP_CWORD]}}"
-
-      #     if [ $COMP_CWORD -{op} {level_num} ]; then
-      #         COMPREPLY=( $( compgen {compreply} -- $cur) ){subcommand_switch}
-      #     fi
-      # }}
-
-      res = <<-TMPL
-
-        _#{cmd_name}()
-        {
-            local cur
-            cur="${COMP_WORDS[COMP_CWORD]}"
-
-            if [ $COMP_CWORD -#{op} #{level_num} ]; then
-                COMPREPLY=( $( compgen #{compreply} -- $cur) )#{subcommand_switch}
-            fi
-        }
-        TMPL
 
       subcommands.each do |subcommand_name, subcommand_tree|
-        res += create_section("#{cmd_name}_#{subcommand_name}", subcommand_tree, option_help, level_num + 1)
+        section += create_section("#{cmd_name}_#{subcommand_name}", subcommand_tree, option_help, level_num + 1)
       end
-
-      res
-    end
-
-    def sanitize_name(name : String) : String
-      # Some bash versions don't support ".", "-", etc. in function names
-      valid_chars = ('a'..'z').to_a + ('A'..'Z').to_a + ('0'..'9').to_a + ["_"]
-      name.chars.select { |char| valid_chars.includes?(char) }.join
+      section
     end
 
     def get_completion_file_content(cmd : String, param_tree : CommandParams, option_help : Hash(String, String)) : String
-      completion_file_inner_content = create_section(sanitize_name(cmd), param_tree, option_help, 1)
-
-      # FILE_TEMPLATE
-      # Original mustache:
-      #
-      #  {0}\ncomplete -o bashdefault -o default -o filenames -F _{1} {2}
-
-      <<-FILE_TEMPLATE
-        #{completion_file_inner_content}
-        complete -o bashdefault -o default -o filenames -F _#{sanitize_name(cmd)} #{cmd}
-        FILE_TEMPLATE
-    end
-
-    def parse_params : Tuple(CommandParams, Hash(String, String))
-      # This creates a parameter tree (CommandParam object) for the target docopt tool.
-      # Also returns a second parameter, a hash of:
-      #   option -> option-help-string
-      options = Docopt.parse_defaults(@doc)
-      option_help = Hash(String, String).new
-
-      options.each do |option|
-        if !option.short.nil?
-          option_help[option.short.to_s] = option.description
-        end
-        if !option.long.nil?
-          option_help[option.long.to_s] = option.description
-        end
-      end
-
-      pattern = Docopt.parse_pattern(
-        Docopt.formal_usage(@usage), options)
-      param_tree = CommandParams.new
-      build_command_tree(pattern, param_tree)
-      {param_tree, option_help}
-    end
-
-    # ameba:disable Metrics/CyclomaticComplexity
-    def build_command_tree(pattern : Docopt::Pattern, cmd_params : CommandParams) : CommandParams
-      # Recursively fill in a command tree in cmd_params according to a docopt-parsed "pattern" object.
-      case pattern
-      when Docopt::Either, Docopt::Optional, Docopt::OneOrMore
-        if !pattern.children.nil?
-          pattern.children.as(Array(Docopt::Pattern)).each do |child|
-            build_command_tree(child, cmd_params)
-          end
-        end
-      when Docopt::Required
-        if !pattern.children.nil?
-          pattern.children.as(Array(Docopt::Pattern)).each do |child|
-            cmd_params = build_command_tree(child, cmd_params)
-          end
-        end
-      when Docopt::Option
-        suffix = pattern.argcount > 0 ? "=" : ""
-        cmd_params.options << "#{pattern.short}#{suffix}" if pattern.short
-        cmd_params.options << "#{pattern.long}#{suffix}" if pattern.long
-      when Docopt::Command
-        cmd_params = cmd_params.get_subcommand(pattern.name.to_s)
-      when Docopt::Argument
-        cmd_params.arguments << pattern.name.to_s
-      end
-      cmd_params
+      name = sanitize_name(cmd)
+      "#{create_section(name, param_tree, option_help, 1)}\ncomplete -o bashdefault -o default -o filenames -F _#{name} #{cmd}\n"
     end
   end
 

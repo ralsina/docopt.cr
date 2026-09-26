@@ -72,14 +72,14 @@ describe "Docopt" do
   it "should parse option_help" do
     bash_completion = Docopt::BashCompletion.new full_doc
     _, option_help = bash_completion.parse_params
-    # The python version uses "--speed=" but this looks good enough
+    # The [default: ...] annotation is stripped from descriptions
     expected = {"--drifting" => "Drifting mine.",
                 "--help"     => "Show this screen.",
                 "--moored"   => "Moored (anchored) mine.",
-                "--speed"    => "Speed in knots [default: 10].",
+                "--speed"    => "Speed in knots.",
                 "--version"  => "Show version.",
                 "-h"         => "Show this screen.",
-                "-s"         => "Speed in knots [default: 10].",
+                "-s"         => "Speed in knots.",
     }
     option_help.size.should eq expected.size
     option_help.each do |key, value|
@@ -165,8 +165,9 @@ describe "Docopt" do
     expected = <<-EXPECTED
       _x_init()
       {
-          local cur
+          local cur prev
           cur="${COMP_WORDS[COMP_CWORD]}"
+          prev="${COMP_WORDS[COMP_CWORD-1]}"
 
           if [ $COMP_CWORD -ge 2 ]; then
               COMPREPLY=( $( compgen -W "$(ls -l /)" -- $cur) )
@@ -200,9 +201,12 @@ describe "Docopt" do
 
   it "should create fish completion with subcommands" do
     fish_completion = Docopt.fish_completion("naval_fate", full_doc)
-    fish_completion.should contain("__fish_seen_subcommand_from naval_fate")
-    fish_completion.should contain("__fish_seen_subcommand_from ship")
-    fish_completion.should contain("__fish_seen_subcommand_from mine")
+    # Root subcommands complete while no subcommand has been used yet
+    fish_completion.should contain("complete -c naval_fate -f -n '__fish_use_subcommand' -a 'init ship mine save set_speed'")
+    # Deeper levels require the path, chained with "; and" (fish does
+    # not treat a bare "and" as a command chain)
+    fish_completion.should contain("__fish_seen_subcommand_from ship; and not __fish_seen_subcommand_from new move shoot")
+    fish_completion.should contain("__fish_seen_subcommand_from mine; and")
     fish_completion.should contain("complete -c naval_fate -f -n")
   end
 
@@ -233,9 +237,11 @@ describe "Docopt" do
 
   it "should create zsh completion with command arguments" do
     zsh_completion = Docopt.zsh_completion("naval_fate", full_doc)
-    zsh_completion.should contain("'ship:ship'")
-    zsh_completion.should contain("'mine:mine'")
-    zsh_completion.should contain("'init:init'")
+    zsh_completion.should contain("_values 'command' 'init' 'ship' 'mine' 'save' 'set_speed'")
+    # Remaining words dispatch to the matching subcommand function
+    zsh_completion.should contain("(ship) _naval_fate_ship ;;")
+    zsh_completion.should contain("(mine) _naval_fate_mine ;;")
+    zsh_completion.should contain("(new) _naval_fate_ship_new ;;")
   end
 
   it "should create zsh completion with option arguments" do
@@ -290,8 +296,8 @@ describe "Docopt" do
     custom_completions = {"--theme" => "dark light auto"}
     fish_completion = Docopt.fish_completion("tool", doc_with_option, custom_completions)
 
-    fish_completion.should contain("complete -c tool -l theme -d '--theme='")
-    fish_completion.should contain("complete -c tool -f -n 'string match -q \"* --theme *\" (commandline)' -a 'dark light auto'")
+    # -r makes fish use the -a words for the option's value
+    fish_completion.should contain("complete -c tool -l theme -d 'Set the theme.' -r -a 'dark light auto'")
   end
 
   it "should support custom completions for options with arguments (bash)" do
@@ -308,7 +314,10 @@ describe "Docopt" do
     custom_completions = {"--theme" => "dark light auto"}
     bash_completion = Docopt.bash_completion("tool", doc_with_option, custom_completions)
 
-    bash_completion.should contain("--theme=dark light auto")
+    # After "--theme " the custom words are offered, and the attached
+    # "--theme=<TAB>" form offers the values pre-attached
+    bash_completion.should contain("        --theme)\n            COMPREPLY=( $( compgen -W \"dark light auto\" -- $cur) )")
+    bash_completion.should contain("--theme=dark --theme=light --theme=auto")
   end
 
   it "should support custom completions for options with arguments (zsh)" do
@@ -325,7 +334,7 @@ describe "Docopt" do
     custom_completions = {"--theme" => "dark light auto"}
     zsh_completion = Docopt.zsh_completion("tool", doc_with_option, custom_completions)
 
-    zsh_completion.should contain("'--theme=[--theme=]:{$(dark light auto)}'")
+    zsh_completion.should contain("'--theme=[Set the theme.]:value:(dark light auto)'")
   end
 
   it "should support custom completions for short options with arguments" do
@@ -346,12 +355,11 @@ describe "Docopt" do
     bash_completion = Docopt.bash_completion("tool", doc_with_short_option, custom_completions)
     zsh_completion = Docopt.zsh_completion("tool", doc_with_short_option, custom_completions)
 
-    fish_completion.should contain("complete -c tool -f -n 'string match -q \"* -t *\" (commandline)' -a 'dark light auto'")
-    fish_completion.should contain("dark light auto")
+    fish_completion.should contain("complete -c tool -s t -d 'Set the theme.' -r -a 'dark light auto'")
 
-    bash_completion.should contain("-t dark light auto")
+    bash_completion.should contain("        -t)\n            COMPREPLY=( $( compgen -W \"dark light auto\" -- $cur) )")
 
-    zsh_completion.should contain("'-t[-t=]:{$(dark light auto)}'")
+    zsh_completion.should contain("'-t=[Set the theme.]:value:(dark light auto)'")
   end
 
   it "should not apply custom completions to options without arguments" do

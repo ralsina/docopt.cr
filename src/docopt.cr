@@ -771,6 +771,7 @@ end
 require "./docopt/compiled"
 
 # Require completion modules
+require "./completion"
 require "./bash_completion"
 require "./fish_completion"
 require "./zsh_completion"

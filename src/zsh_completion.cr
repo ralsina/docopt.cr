@@ -1,22 +1,20 @@
-require "./docopt"
+require "./completion"
 
 # ZSH shell completion generation for docopt
 #
 # This module provides ZSH shell completion functionality by leveraging
-# the same parsing infrastructure as the bash completion.
+# the same parsing infrastructure shared with the bash completion.
+#
+# Subcommands use the canonical zsh state-machine shape: _arguments
+# moves the first positional into a state, which offers the node's
+# subcommands, and the remaining words dispatch to the subcommand's
+# own function (matching a subcommand name anywhere in the remaining
+# words, so positional arguments between subcommands still dispatch).
 
 module Docopt
   extend self
 
-  class ZshCompletion
-    @doc : String
-    @usage : String
-    @custom_completions : Hash(String, String)
-
-    def initialize(@doc, @custom_completions = {} of String => String)
-      @usage = Docopt.parse_section("usage:", @doc)[0]
-    end
-
+  class ZshCompletion < Completion
     def completion_path : String
       "/usr/share/zsh/site-functions"
     end
@@ -25,232 +23,131 @@ module Docopt
       "#{completion_path}/_#{cmd}"
     end
 
-    def sanitize_name(name : String) : String
-      # ZSH function names need to be valid shell identifiers
-      name.gsub(/[^a-zA-Z0-9_]/, "_")
+    private def function_name_for(path : Array(String)) : String
+      "_" + path.map { |segment| sanitize_name(segment) }.join("_")
     end
 
-    def create_option_args(options : Array(String), option_help : Hash(String, String)) : Array(String)
-      return [] of String if options.empty?
+    # [ and ] would close the description bracket inside a spec.
+    private def zsh_description(description : String) : String
+      description.gsub(/[\[\]]/, "")
+    end
 
-      args = [] of String
+    # Completion action for custom values: a literal word list in
+    # parentheses, or shell code in braces for the "$(cmd)" form.
+    private def value_action(custom : String?) : String?
+      return if custom.nil?
+      if custom.starts_with?("$(") && custom.ends_with?(")")
+        "{#{custom}}"
+      else
+        "(#{custom.split.join(" ")})"
+      end
+    end
 
-      options.each do |option|
-        description = option_help[option]? || option
-        if option.starts_with?("--")
-          # Long option
-          arg_name = option[2..]
-          option_name = option.chomp("=")
+    private def plain_words(custom : String) : Array(String)
+      custom.gsub("$(", "").gsub(")", "").split
+    end
 
-          if option.ends_with?("=") && @custom_completions.has_key?(option_name)
-            # Option takes an argument with custom completion
-            custom_completion = @custom_completions[option_name]
-            args << "'--#{arg_name}[#{description}]:{$(#{custom_completion})}'"
-          elsif option.ends_with?("=")
-            # Option takes an argument without custom completion
-            args << "'--#{arg_name[0..-2]}[#{description}]:'"
-          else
-            # Boolean option
-            args << "'--#{arg_name}[#{description}]'"
-          end
-        elsif option.starts_with?("-") && option.size > 1
-          # Short option
-          arg_name = option[1]
-          option_name = option.chomp("=")
-
-          if option.ends_with?("=") && @custom_completions.has_key?(option_name)
-            # Option takes an argument with custom completion
-            custom_completion = @custom_completions[option_name]
-            args << "'-#{arg_name}[#{description}]:{$(#{custom_completion})}'"
-          elsif option.ends_with?("=")
-            # Option takes an argument without custom completion
-            args << "'-#{arg_name}[#{description}]:'"
-          else
-            # Boolean option
-            args << "'-#{arg_name}[#{description}]'"
-          end
+    # One _arguments spec per option name (short and long forms each
+    # get one), with the description in brackets and, for options that
+    # take a value, an action for the value.
+    private def option_spec_strings(param_tree : CommandParams, option_help : Hash(String, String)) : Array(String)
+      specs = [] of String
+      param_tree.option_specs.each do |spec|
+        next if (name = spec.name).nil?
+        description = zsh_description(description_for(name, option_help))
+        action = spec.takes_value? ? value_action(custom_for(spec)) : nil
+        [spec.long, spec.short].compact.each do |option_name|
+          base = spec.takes_value? ? "#{option_name}=" : option_name
+          spec_string = "'#{base}[#{description}]'"
+          spec_string = "'#{base}[#{description}]:value:#{action}'" if action
+          specs << spec_string
         end
       end
-
-      args
+      specs
     end
 
-    def create_command_args(subcommands : Hash(String, CommandParams)) : Array(String)
-      return [] of String if subcommands.empty?
+    private def create_function(path : Array(String), param_tree : CommandParams, option_help : Hash(String, String)) : String
+      function_name = function_name_for(path)
+      custom = @custom_completions[path.join("_")]?
+      subcommands = param_tree.subcommands
 
-      args = subcommands.map do |subcommand_name, _|
-        "'#{subcommand_name}:#{subcommand_name}'"
+      specs = option_spec_strings(param_tree, option_help)
+      if subcommands.empty?
+        param_tree.arguments.each do |argument|
+          specs << "':#{argument}:#{value_action(custom) || "_files"}'"
+        end
+      else
+        specs << (param_tree.arguments.empty? ? "':command:->command'" : "':argument:->first'")
+        specs << "'*::rest:->rest'"
       end
 
-      args
-    end
-
-    def create_argument_completions(arguments : Array(String), custom_name : String) : Array(String)
-      return [] of String if arguments.empty?
-
-      # Check for custom completion first
-      if @custom_completions.has_key?(custom_name)
-        custom_completion = @custom_completions[custom_name]
-        return ["{$(#{custom_completion})}"]
-      end
-
-      # Default to file completion for arguments
-      ["_files"]
-    end
-
-    def create_function_body(cmd_name : String, param_tree : CommandParams, option_help : Hash(String, String), command_parts : Array(String), indent : Int32 = 0) : String
       lines = [] of String
-      indent_str = "  " * indent
-
-      # Handle state machine for subcommands
-      unless param_tree.subcommands.empty?
-        lines << "#{indent_str}local -a commands"
-        command_args = create_command_args(param_tree.subcommands)
-        lines << "#{indent_str}commands=(#{command_args.join(" ")})"
-
-        lines << "#{indent_str}_describe 'command' commands"
+      lines << "#{function_name}() {"
+      lines << "    local context state line"
+      lines << "    typeset -A opt_args"
+      lines << ""
+      unless specs.empty?
+        lines << "    _arguments -s -S \\"
+        specs.each_with_index do |spec, index|
+          lines << "        #{spec}#{index < specs.size - 1 ? " \\" : ""}"
+        end
         lines << ""
       end
 
-      # Handle options
-      unless param_tree.options.empty?
-        option_args = create_option_args(param_tree.options, option_help)
-        lines << "#{indent_str}_arguments -s -S #{option_args.join(" ")}" unless option_args.empty?
-      end
-
-      # Handle arguments with proper custom completion names
-      unless param_tree.arguments.empty?
-        custom_name = command_parts.join("_")
-        argument_completions = create_argument_completions(param_tree.arguments, custom_name)
-        argument_completions.each do |completion|
-          lines << "#{indent_str}#{completion}"
-        end
-      end
-
-      lines.join("\n")
-    end
-
-    def create_completion_function(cmd_name : String, param_tree : CommandParams, option_help : Hash(String, String), function_name : String? = nil, command_parts : Array(String) = [] of String) : String
-      function_name ||= "_#{sanitize_name(cmd_name)}"
-      current_command_parts = command_parts.empty? ? [cmd_name] : command_parts
-
-      # Main function header
-      header = <<-HEADER
-        #{function_name}() {
-          local context state line
-          typeset -A opt_args
-
-        HEADER
-
-      # Create state machine for subcommands
-      state_machine = create_state_machine(cmd_name, param_tree, option_help, function_name)
-
-      # Main function body
-      body = create_function_body(cmd_name, param_tree, option_help, current_command_parts, 1)
-
-      # Generate subcommand functions
-      subcommand_functions = ""
-      param_tree.subcommands.each do |subcommand_name, subcommand_tree|
-        sub_function_name = "#{function_name}_#{subcommand_name}"
-        new_command_parts = current_command_parts + [subcommand_name]
-        subcommand_functions += "\n" + create_completion_function(cmd_name, subcommand_tree, option_help, sub_function_name, new_command_parts)
-      end
-
-      # Footer
-      footer = "\n}"
-
-      "#{header}#{state_machine}#{body}#{subcommand_functions}#{footer}"
-    end
-
-    def create_state_machine(cmd_name : String, param_tree : CommandParams, option_help : Hash(String, String), function_name : String) : String
-      return "" if param_tree.subcommands.empty?
-
-      lines = [] of String
-
-      # Create case statement for subcommands
-      lines << "  case $state in"
-      lines << "    command)"
-
-      param_tree.subcommands.each do |subcommand_name, _|
-        sub_function_name = "#{function_name}_#{subcommand_name}"
-        lines << "      #{subcommand_name})"
-        lines << "        #{sub_function_name}"
-        lines << "        ;;"
-        lines << ""
-      end
-
-      lines << "      *)"
-      lines << "        ;;"
-      lines << "    esac"
-      lines << "  ;;"
-
-      # Create subcommand functions
-      param_tree.subcommands.each do |subcommand_name, subcommand_tree|
-        sub_function_name = "#{function_name}_#{subcommand_name}"
-        sub_function = create_completion_function(cmd_name, subcommand_tree, option_help, sub_function_name)
-        lines << "\n" + sub_function
-      end
-
-      lines.join("\n")
-    end
-
-    def parse_params : Tuple(CommandParams, Hash(String, String))
-      # This creates a parameter tree (CommandParam object) for the target docopt tool.
-      # Also returns a second parameter, a hash of:
-      #   option -> option-help-string
-      options = Docopt.parse_defaults(@doc)
-      option_help = Hash(String, String).new
-
-      options.each do |option|
-        if !option.short.nil?
-          option_help[option.short.to_s] = option.description
-        end
-        if !option.long.nil?
-          option_help[option.long.to_s] = option.description
-        end
-      end
-
-      pattern = Docopt.parse_pattern(
-        Docopt.formal_usage(@usage), options)
-      param_tree = CommandParams.new
-      build_command_tree(pattern, param_tree)
-      {param_tree, option_help}
-    end
-
-    # ameba:disable Metrics/CyclomaticComplexity
-    def build_command_tree(pattern : Docopt::Pattern, cmd_params : CommandParams) : CommandParams
-      # Recursively fill in a command tree in cmd_params according to a docopt-parsed "pattern" object.
-      case pattern
-      when Docopt::Either, Docopt::Optional, Docopt::OneOrMore
-        if !pattern.children.nil?
-          pattern.children.as(Array(Docopt::Pattern)).each do |child|
-            build_command_tree(child, cmd_params)
+      unless subcommands.empty?
+        lines << "    case $state in"
+        if param_tree.arguments.empty?
+          lines << "        (command)"
+          subcommand_list = subcommands.keys.map { |name| "'#{name}'" }.join(" ")
+          lines << "            _values 'command' #{subcommand_list}"
+          lines << "            ;;"
+        else
+          lines << "        (first)"
+          lines << "            _alternative \\"
+          lines << "                'subcommands:subcommand:_values subcommand #{subcommands.keys.join(" ")}' \\"
+          if custom
+            if custom.starts_with?("$(") && custom.ends_with?(")")
+              lines << "                'arguments:argument:#{value_action(custom)}'"
+            else
+              lines << "                'arguments:argument:_values argument #{plain_words(custom).join(" ")}'"
+            end
+          else
+            lines << "                'arguments:argument:_files'"
           end
+          lines << "            ;;"
         end
-      when Docopt::Required
-        if !pattern.children.nil?
-          pattern.children.as(Array(Docopt::Pattern)).each do |child|
-            cmd_params = build_command_tree(child, cmd_params)
-          end
+        lines << "        (rest)"
+        # Walk the remaining words so a subcommand is still found when
+        # positional arguments sit between subcommands (alternation in
+        # a case pattern needs no extended_glob, unlike a ${...:#...}
+        # parameter pattern).
+        lines << "            local sub=\"\" command_word"
+        lines << "            for command_word in $words; do"
+        lines << "                case $command_word in"
+        subcommands.each_key do |subcommand_name|
+          lines << "                    (#{subcommand_name}) sub=#{subcommand_name} ;;"
         end
-      when Docopt::Option
-        suffix = pattern.argcount > 0 ? "=" : ""
-        cmd_params.options << "#{pattern.short}#{suffix}" if pattern.short
-        cmd_params.options << "#{pattern.long}#{suffix}" if pattern.long
-      when Docopt::Command
-        cmd_params = cmd_params.get_subcommand(pattern.name.to_s)
-      when Docopt::Argument
-        cmd_params.arguments << pattern.name.to_s
+        lines << "                esac"
+        lines << "            done"
+        lines << "            case $sub in"
+        subcommands.each_key do |subcommand_name|
+          lines << "                (#{subcommand_name}) #{function_name_for(path + [subcommand_name])} ;;"
+        end
+        lines << "            esac"
+        lines << "            ;;"
+        lines << "    esac"
       end
-      cmd_params
+      lines << "}"
+      lines << ""
+
+      subcommands.each do |subcommand_name, subcommand_tree|
+        lines << create_function(path + [subcommand_name], subcommand_tree, option_help)
+      end
+      lines.join("\n")
     end
 
     def get_completion_file_content(cmd : String, param_tree : CommandParams, option_help : Hash(String, String)) : String
-      # ZSH completions use a more structured approach with state machines
-      completion_function = create_completion_function(cmd, param_tree, option_help)
-
-      # Add compdef registration
-      "#compdef #{cmd}\n# ZSH completion for #{cmd}\n# Generated by docopt.cr\n\n#{completion_function}\n\n_#{cmd} \"$@\""
+      "#compdef #{cmd}\n# ZSH completion for #{cmd}\n# Generated by docopt.cr\n\n#{create_function([cmd], param_tree, option_help)}\n"
     end
   end
 
