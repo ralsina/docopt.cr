@@ -92,13 +92,19 @@ module Docopt
     @usage : String
     @custom_completions : Hash(String, String)
 
-    def initialize(doc : String, @custom_completions = {} of String => String)
-      sections = Docopt.parse_section("usage:", doc)
-      if sections.empty?
-        raise DocoptLanguageError.new("\"usage:\" (case-insensitive) not found.")
+    # A nil doc builds a generator that will only ever be handed a
+    # prebuilt tree (see the tree-based completion entry points).
+    def initialize(doc : String?, @custom_completions = {} of String => String)
+      @doc = ""
+      @usage = ""
+      if doc
+        sections = Docopt.parse_section("usage:", doc)
+        if sections.empty?
+          raise DocoptLanguageError.new("\"usage:\" (case-insensitive) not found.")
+        end
+        @doc = doc
+        @usage = sections[0]
       end
-      @doc = doc
-      @usage = sections[0]
     end
 
     # Where the generated script is conventionally installed.
@@ -204,6 +210,19 @@ module Docopt
         branch = shortcut.as(BranchPattern)
         branch.children = (options - pattern_options).uniq.map { |option| option.as(Pattern) }
       end
+    end
+  end
+
+  # Reads a doc's CommandParams tree without generating any script:
+  # the shared entry point for tree consumers, like Dispatch's
+  # whole-registry completions.
+  class DocTree < Completion
+    def completion_path : String
+      ""
+    end
+
+    def self.read(doc : String) : Tuple(CommandParams, Hash(String, String))
+      new(doc).parse_params
     end
   end
 end

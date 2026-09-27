@@ -173,6 +173,41 @@ module Docopt
         .first(4)
     end
 
+    # One completion tree covering every registered command: the root
+    # completes the command names (plus help), and each command's own
+    # options, arguments and subcommands come from its doc. Custom
+    # completions follow the generators' convention: the command path
+    # joined with "_" ("say_hello"), or an option name.
+    def self.completion_params : Tuple(CommandParams, Hash(String, String))
+      root = CommandParams.new
+      option_help = Hash(String, String).new
+      COMMANDS.each do |name, command|
+        doc_tree, doc_help = DocTree.read(command.doc)
+        root.subcommands[name] = doc_tree.subcommands.fetch(name, doc_tree)
+        option_help.merge!(doc_help)
+      end
+      root.subcommands["help"] = CommandParams.new
+      {root, option_help}
+    end
+
+    # A bash completion script for every registered command.
+    def self.bash_completion(cmd : String, custom_completions = {} of String => String) : String
+      param_tree, option_help = completion_params
+      Docopt.bash_completion(cmd, param_tree, option_help, custom_completions)
+    end
+
+    # A fish completion script for every registered command.
+    def self.fish_completion(cmd : String, custom_completions = {} of String => String) : String
+      param_tree, option_help = completion_params
+      Docopt.fish_completion(cmd, param_tree, option_help, custom_completions)
+    end
+
+    # A zsh completion script for every registered command.
+    def self.zsh_completion(cmd : String, custom_completions = {} of String => String) : String
+      param_tree, option_help = completion_params
+      Docopt.zsh_completion(cmd, param_tree, option_help, custom_completions)
+    end
+
     # Case-insensitive Levenshtein edit distance between two strings
     def self.levenshtein_distance(left : String, right : String) : Int32
       left_chars = left.downcase.chars

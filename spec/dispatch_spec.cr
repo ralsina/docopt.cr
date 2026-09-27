@@ -245,3 +245,66 @@ describe Docopt::Dispatch do
     end
   end
 end
+
+describe "Docopt::Dispatch completions" do
+  it "grafts every registered command under one root" do
+    tree, _option_help = Docopt::Dispatch.completion_params
+    tree.subcommands.keys.should contain "greet"
+    tree.subcommands.keys.should contain "fail"
+    tree.subcommands.keys.should contain "great"
+    # the built-in help command completes too
+    tree.subcommands.keys.should contain "help"
+    greet_words = tree.subcommands["greet"].option_specs.flat_map(&.words)
+    greet_words.should contain "--upper"
+    greet_words.should contain "-p="
+  end
+
+  it "generates a bash script completing command names and options" do
+    with_completion_workdir do |dir|
+      script = File.join(dir, "spec.sh")
+      File.write(script, Docopt::Dispatch.bash_completion("spec"))
+
+      replies, error = bash_complete(script, "_spec", [""])
+      replies.should eq ["greet", "fail", "great", "help"]
+      error.should_not contain("command not found")
+
+      replies, _error = bash_complete(script, "_spec", ["gr"])
+      replies.should eq ["greet", "great"]
+
+      replies, _error = bash_complete(script, "_spec", ["greet", ""])
+      replies.should contain "--upper"
+      replies.should contain "-p="
+    end
+  end
+
+  it "applies custom completions per command path" do
+    with_completion_workdir do |dir|
+      script = File.join(dir, "spec.sh")
+      File.write(script, Docopt::Dispatch.bash_completion("spec", {"spec_greet" => "mars venus"}))
+      replies, _error = bash_complete(script, "_spec", ["greet", ""])
+      replies.should eq ["mars", "venus"]
+    end
+  end
+
+  if shell_available?("fish") && shell_available?("zsh")
+    it "generates valid fish and zsh scripts" do
+      with_completion_workdir do |dir|
+        fish_script = File.join(dir, "spec.fish")
+        zsh_script = File.join(dir, "_spec")
+        File.write(fish_script, Docopt::Dispatch.fish_completion("spec"))
+        File.write(zsh_script, Docopt::Dispatch.zsh_completion("spec"))
+
+        status, _output, error = run_shell("fish", ["--no-execute", fish_script])
+        status.should eq 0
+        error.should be_empty
+        status, _output, error = run_shell("zsh", ["-n", zsh_script])
+        status.should eq 0
+        error.should be_empty
+
+        words = fish_complete(fish_script, "spec ")
+        words.should contain "greet"
+        words.should contain "help"
+      end
+    end
+  end
+end

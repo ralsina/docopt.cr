@@ -200,6 +200,19 @@ dispatching is a plain argv match. Help requests are not honored
 after a `--` separator. This layer grew out of the polydocopt shard;
 its README has the full behavior table.
 
+Dispatch composes with the completion generators: one script covers
+the whole command tree, with each command's options and arguments
+coming from its own doc, and custom completions keyed by command path
+(`"say_hello"`):
+
+```crystal
+puts Docopt::Dispatch.bash_completion("say")
+puts Docopt::Dispatch.fish_completion("say", {"say_hello" => "world mars"})
+puts Docopt::Dispatch.zsh_completion("say")
+```
+
+See `examples/dispatch` for a complete tool with completion flags.
+
 ## Shell Completion Generation
 
 docopt.cr can generate shell completion scripts for bash, fish, and zsh

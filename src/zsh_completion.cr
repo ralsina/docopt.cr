@@ -160,4 +160,16 @@ module Docopt
     param_tree, option_help = completion.parse_params
     completion.get_completion_file_content(cmd, param_tree, option_help)
   end
+
+  # Completion script for a prebuilt parameter tree, like the one
+  # DocTree.read or Dispatch.completion_params produce.
+  def zsh_completion(
+    cmd : String,
+    param_tree : CommandParams,
+    option_help : Hash(String, String),
+    custom_completions = {} of String => String,
+  ) : String
+    completion = ZshCompletion.new nil, custom_completions
+    completion.get_completion_file_content(cmd, param_tree, option_help)
+  end
 end

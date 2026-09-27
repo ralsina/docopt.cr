@@ -1,5 +1,5 @@
 name: docopt
-version: 0.6.0
+version: 0.7.0
 
 authors:
   - chenkovsky.chen <chenkov@yeah.net>
@@ -12,6 +12,8 @@ crystal: '>= 1.13.0'
 targets:
   naval_fate:
     main: examples/naval_fate.cr
+  say:
+    main: examples/dispatch/main.cr
 
 development_dependencies:
   ameba:
