@@ -21,11 +21,8 @@ conformant with the official docopt test suite, that grew:
   command's options resolved through the full precedence chain
 
 See the [changelog](CHANGELOG.md) for release history.
-* Custom hooks for smarter completion
-
 
 ## Installation
-
 
 Add this to your application's `shard.yml`:
 
@@ -33,53 +30,50 @@ Add this to your application's `shard.yml`:
 dependencies:
   docopt:
     github: ralsina/docopt.cr
+    version: "~> 1.0"
 ```
 
 
 ## Usage
 
+Declare your interface as its own help text; docopt parses argv
+against it and hands you the values:
 
 ```crystal
 require "docopt"
-describe "Docopt" do
-  # TODO: Write tests
 
-  it "works" do
-    doc = <<-DOC
-    Naval Fate.
+doc = <<-DOC
+  Naval Fate.
 
-    Usage:
-      naval_fate ship new <name>...
-      naval_fate ship <name> move <x> <y> [--speed=<kn>]
-      naval_fate ship shoot <x> <y>
-      naval_fate mine (set|remove) <x> <y> [--moored|--drifting]
-      naval_fate -h | --help
-      naval_fate --version
+  Usage:
+    naval_fate ship new <name>...
+    naval_fate ship <name> move <x> <y> [--speed=<kn>]
+    naval_fate ship shoot <x> <y>
+    naval_fate mine (set|remove) <x> <y> [--moored|--drifting]
+    naval_fate -h | --help
+    naval_fate --version
 
-    Options:
-      -h --help     Show this screen.
-      --version     Show version.
-      --speed=<kn>  Speed in knots [default: 10].
-      --moored      Moored (anchored) mine.
-      --drifting    Drifting mine.
-    DOC
-    std = {"ship" => true, "new" => false, "<name>" => ["A"], "move" => true, "<x>" => "a", "<y>" => "b", "--speed" => "3", "shoot" => false, "mine" => false, "set" => false, "remove" => false, "--moored" => nil, "--drifting" => nil, "-h" => nil, "--help" => false, "--version" => nil}
-    ans = Docopt.docopt(doc, argv = ["ship", "A", "move", "a", "b", "--speed=3"])
-    ans["<name>"].should eq(std["<name>"])
-  end
-  it "one or more" do
-    doc = <<-DOC
-    test
-    Usage:
-        naval [--files=files...]
-    DOC
-    ans = Docopt.docopt(doc, argv = ["--files=a.txt", "--files=b.txt"])
-    farr = ans["--files"] as Array(String)
-    "a.txt".should eq(farr[0])
-    "b.txt".should eq(farr[1])
-  end
+  Options:
+    -h --help     Show this screen.
+    --version     Show version.
+    --speed=<kn>  Speed in knots [default: 10].
+    --moored      Moored (anchored) mine.
+    --drifting    Drifting mine.
+  DOC
+
+options = Docopt.docopt(doc, ARGV)
+if options["--version"]
+  puts "naval_fate 1.0"
+elsif options["ship"] && options["move"]
+  speed = options["--speed"].as(String)
+  puts "Moving #{options["<name>"]} to #{options["<x>"]},#{options["<y>"]} at #{speed} knots"
 end
 ```
+
+Flags parse as booleans, options with arguments as strings, repeated
+elements as arrays and counting flags as integers; unmatched argv
+prints the usage and exits (or raises `Docopt::DocoptExit` with
+`exit: false`).
 
 ## Compile-time parsing
 
@@ -343,6 +337,18 @@ using `bash` ability to run commands inside other commands:
 And the completion for `naval_fate ship new` would be the output of
 `naval_fate ship list`.
 
+Options that take an argument have their own custom completions, keyed
+by the option name: after `--speed ` (or `--speed=`) the values are
+offered, and in bash the attached form completes `--speed=5`-style
+words.
+
+```crystal
+completions = {"--speed" => "5 10 15 20"}
+```
+
+Without a custom, the value of an option with an argument completes
+with file names.
+
 ### Custom Completions for All Shells
 
 The custom completion system works consistently across all three shells:
@@ -364,47 +370,49 @@ This ensures consistent completion behavior regardless of which shell the user p
 
 ## Examples
 
-See the `examples/` directory for a complete working example:
+Both are built by `shards build` and installed in CI; see
+`examples/README.md`.
 
 ### Naval Fate CLI
 
-The `naval_fate` application demonstrates real-world usage:
+The classic docopt example, with completion generation for the three
+shells and custom completions with dynamic content:
 
 ```bash
-# Build and run the example
-cd examples
-crystal build naval_fate.cr -o naval_fate
-./naval_fate --help
-
-# Generate completions
-./naval_fate --completion-bash > ~/.bash_completion.d/naval_fate
-./naval_fate --completion-fish > ~/.config/fish/completions/naval_fate.fish
-./naval_fate --completion-zsh > ~/.local/share/zsh/site-functions/_naval_fate
+./bin/naval_fate --help
+./bin/naval_fate --completion-bash > ~/.bash_completion.d/naval_fate
 ```
 
-Features demonstrated:
-- Multi-subcommand CLI structure
-- Custom completions with dynamic ship names
-- Real-time fleet management
-- Shell-appropriate completion behaviors
+### say
 
-Run `examples/test_completion.sh` to see a complete demonstration of the completion functionality.
+A subcommand-oriented tool built from the dispatch and completion
+layers: each command carries its own doc, and one completion script
+covers the whole tree:
+
+```bash
+./bin/say help
+./bin/say hello --shout -p mars
+./bin/say --completion-bash
+```
 
 ## Development
 
-### Building
-
 ```bash
-crystal build src/docopt.cr
-crystal spec  # Run tests
-ameba --fix  # Run linter
+shards build  # Builds both examples
+crystal spec  # 353 examples: unit, reference, conformance and real-shell completion tests
+ameba         # Lint
 ```
+
+The spec suite runs the official docopt conformance cases
+(`spec/fixtures/testcases.docopt`), a port of the reference unit
+tests, and executes generated completion scripts through real bash
+(fish and zsh when installed).
 
 ## Contributing
 
 1. Fork it ( https://github.com/ralsina/docopt.cr/fork )
 2. Create your feature branch (git checkout -b my-new-feature)
-3. Commit your changes (git commit -am 'Add some feature')
+3. Commit your changes using conventional commit messages (feat:, fix:, chore:, ...) — the changelog is generated from them
 4. Push to the branch (git push origin my-new-feature)
 5. Create a new Pull Request
 

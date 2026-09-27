@@ -1,6 +1,20 @@
 # docopt.cr Examples
 
-This directory contains example applications that demonstrate the shell completion functionality of docopt.cr.
+This directory contains example applications demonstrating the layers
+of docopt.cr. Both are built by `shards build` from the project root.
+
+## say (dispatch + completion)
+
+A git-style tool built from `require "docopt/dispatch"`: each command
+declares its own docopt help text, `Docopt::Dispatch.main` dispatches,
+and `Docopt::Dispatch.bash_completion`/`fish_completion`/
+`zsh_completion` generate one script covering the whole command tree.
+
+```bash
+./bin/say help
+./bin/say hello --shout -p mars
+./bin/say --completion-bash
+```
 
 ## Naval Fate CLI
 
