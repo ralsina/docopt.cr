@@ -125,6 +125,81 @@ given = Docopt.match(compiled.without_defaults, ARGV, exit: false)
 speed = given["--speed"]? || compiled.defaults["--speed"]
 ```
 
+## Configuration Layer
+
+`require "docopt/config"` layers YAML configuration files and
+environment variables under docopt's command-line parsing, with the
+precedence **CLI > environment > config file > docopt defaults**:
+
+```crystal
+require "docopt/config"
+
+options = Docopt.docopt_config(USAGE,
+  argv: ARGV,
+  config_file_path: "config.yml",
+  env_prefix: "MYAPP"
+)
+
+options["--verbose"] # CLI value when given, else env, else file, else default
+```
+
+Config keys map to options in any of three shapes (`verbose`,
+`--verbose`, `input_file` for `--input-file`); values are coerced to
+the type docopt would produce (booleans for flags, arrays for
+repeatable options). Environment variables map from
+`MYAPP_INPUT_FILE`-style names with the same coercion, and
+`--print-config`-style flags can dump the fully-resolved configuration
+as a working config file.
+
+The usage text can be parsed once at compile time, like the core:
+
+```crystal
+CONFIG = Docopt.compile_config(USAGE)
+options = Docopt.docopt_config(CONFIG, argv: ARGV, env_prefix: "MYAPP")
+```
+
+See the docopt-config shard's README for the full tier semantics; the
+code and tests now live here.
+
+## Subcommand Dispatch
+
+`require "docopt/dispatch"` builds git-style tools where every
+subcommand has its own complete docopt help text:
+
+```crystal
+require "docopt/dispatch"
+
+struct Hello < Docopt::Dispatch::Command
+  @@name = "hello"
+  @@doc = <<-HELP
+    Says hello to the world
+
+    Usage:
+      say hello [--shout]
+
+    Options:
+      --shout  SHOUT IT
+    HELP
+
+  def run : Int32
+    puts(options["--shout"] ? "HELLO WORLD" : "hello world")
+    0
+  end
+end
+
+Hello.register
+
+exit(Docopt::Dispatch.main("say", ARGV))
+```
+
+Dispatch handles the `help [COMMAND]` command, `-h`/`--help`,
+git-style "most similar command" suggestions for typos, and exit codes
+(commands propagate their `run` return value; errors exit 1). Each
+command's doc is parsed once and cached (`Command.compiled`), so
+dispatching is a plain argv match. Help requests are not honored
+after a `--` separator. This layer grew out of the polydocopt shard;
+its README has the full behavior table.
+
 ## Shell Completion Generation
 
 docopt.cr can generate shell completion scripts for bash, fish, and zsh
