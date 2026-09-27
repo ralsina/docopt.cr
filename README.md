@@ -407,6 +407,21 @@ The custom completion system works consistently across all three shells:
 
 This ensures consistent completion behavior regardless of which shell the user prefers.
 
+## Man Pages
+
+If the doc is the single source of truth, it is also the manual:
+`Docopt.man_page` turns it into a roff page — the description becomes
+NAME and DESCRIPTION, the usage section SYNOPSIS, the declared options
+OPTIONS with their defaults.
+
+```crystal
+puts Docopt.man_page("naval_fate", doc, version: VERSION)
+```
+
+A typical wiring is a `--man` flag writing it to stdout, or an
+install target putting it in `share/man/man1`. The output is
+deterministic; dates and versions come only from what you pass.
+
 ## Examples
 
 Both are built by `shards build` and installed in CI; see
