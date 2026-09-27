@@ -441,6 +441,10 @@ Docopt.use_tartrazine_color            # or use_tartrazine_color("gruvbox-dark")
 options = Docopt.docopt(doc, ARGV)
 ```
 
+Applications that only want the docopt highlighting can bake just
+that lexer into their binary: build with `-Dnolexers` and
+`TT_LEXERS=docopt` in the compiler's environment.
+
 ## Examples
 
 Both are built by `shards build` and installed in CI; see
