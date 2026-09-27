@@ -66,3 +66,10 @@ def fish_complete(script : String, command_line : String) : Array(String)
   _status, output, _error = run_shell("fish", ["-c", "source #{script.inspect}; and complete -C '#{command_line}'"])
   output.lines.map(&.strip.split('\t').first).reject(&.empty?)
 end
+
+# An IO that claims to be a terminal, for colorizer specs.
+class TTYMemory < IO::Memory
+  def tty? : Bool
+    true
+  end
+end

@@ -422,6 +422,26 @@ A typical wiring is a `--man` flag writing it to stdout, or an
 install target putting it in `share/man/man1`. The output is
 deterministic; dates and versions come only from what you pass.
 
+## Colored Help
+
+Help and usage output can be colored through a hook: set
+`Docopt.colorizer` to any `Proc(String, String)` and it runs on help
+text and usage-in-errors — only on terminals, and only when
+`NO_COLOR` (https://no-color.org) is unset. `Docopt.colorize(text,
+io)` applies the same gating to your own output.
+
+For tartrazine-grade coloring, docopt.cr ships an integration that
+uses tartrazine's own docopt lexer, in-process (add tartrazine to
+your dependencies):
+
+```crystal
+require "docopt"
+require "docopt/color"
+
+Docopt.use_tartrazine_color            # or use_tartrazine_color("gruvbox-dark")
+options = Docopt.docopt(doc, ARGV)
+```
+
 ## Examples
 
 Both are built by `shards build` and installed in CI; see

@@ -1,5 +1,5 @@
 name: docopt
-version: 1.3.0
+version: 1.4.0
 
 authors:
   - chenkovsky.chen <chenkov@yeah.net>
@@ -18,3 +18,5 @@ targets:
 development_dependencies:
   ameba:
     github: crystal-ameba/ameba
+  tartrazine:
+    github: ralsina/tartrazine

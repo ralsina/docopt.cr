@@ -1,6 +1,11 @@
 # Changelog
 
 All notable changes to this project are documented in this file.
+## 1.3.0 - 2026-09-27
+
+### Features
+- Feat: man page generation from the doc
+
 ## 1.2.0 - 2026-09-27
 
 ### Features

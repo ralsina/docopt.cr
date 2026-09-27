@@ -251,7 +251,7 @@ module Docopt
   private def self.handle_help_and_version(args : Hash(String, OptionValue?), doc : String,
                                            help : Bool, version : String?, exit : Bool, io : IO) : Nil
     if help && (args["--help"]? == true || args["-h"]? == true)
-      io.puts doc
+      io.puts Docopt.colorize(doc, io)
       Process.exit(0) if exit
       raise ConfigExit.new("help requested")
     end

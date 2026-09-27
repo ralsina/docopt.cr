@@ -643,7 +643,7 @@ module Docopt
 
   def self.extras(help, version, options, doc)
     if help && options.any? { |o| o.is_a?(LeafPattern) && ["-h", "--help"].includes?(o.name) && o.value }
-      puts doc.strip # \n
+      puts colorize(doc.strip, STDOUT)
       exit
     end
     if version && options.any? { |o| o.is_a?(LeafPattern) && o.name == "--version" && o.value }
@@ -832,6 +832,22 @@ module Docopt
     handle_error(ex, exit)
   end
 
+  # The colorizer hook: set it to a proc that adds color to help and
+  # usage text (tartrazine ships one built on its docopt lexer). It
+  # only runs when the output is a terminal and NO_COLOR
+  # (https://no-color.org) is not set.
+  class_property colorizer : Proc(String, String)? = nil
+
+  # Text with the colorizer applied, when coloring applies to *io*:
+  # a terminal output and no NO_COLOR. Usable for your own output to
+  # keep the same gating as docopt's.
+  def self.colorize(text : String, io : IO) : String
+    colorizer = @@colorizer
+    return text unless colorizer
+    return text unless io.tty? && !ENV.has_key?("NO_COLOR")
+    colorizer.call(text)
+  end
+
   private def self.handle_error(ex : Exception, exit : Bool, usage : String? = nil) : NoReturn
     raise ex unless exit
     usage = DocoptExit.usage if usage.nil?
@@ -839,7 +855,7 @@ module Docopt
     if msg.is_a?(String) && msg.size > 0
       puts msg
     end
-    puts usage if usage && !usage.empty?
+    puts colorize(usage, STDOUT) if usage && !usage.empty?
     Process.exit
   end
 

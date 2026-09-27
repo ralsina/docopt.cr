@@ -123,12 +123,12 @@ module Docopt
     end
 
     private def self.print_top_level_help(progname : String, stdout : IO) : Int32
-      stdout.puts top_level_doc(progname)
+      stdout.puts Docopt.colorize(top_level_doc(progname), stdout)
       0
     end
 
     private def self.print_command_help(command : Command.class, stdout : IO) : Int32
-      stdout.puts command.doc.strip
+      stdout.puts Docopt.colorize(command.doc.strip, stdout)
       0
     end
 
