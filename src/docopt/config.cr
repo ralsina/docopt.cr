@@ -366,15 +366,14 @@ module Docopt
   end
 
   # The declared [default: ...] tier, extracted from the compiled
-  # pattern: long options that take a value, with the raw default
-  # coerced the way config values are (booleans, integers, floats,
-  # quoted strings). Repeated options keep the array docopt itself
-  # would produce for them. Falsy defaults ([default: false]) stay
-  # absent, like before.
+  # pattern: options that take a value (long or short only), with the
+  # raw default coerced the way config values are (booleans, integers,
+  # floats, quoted strings). Repeated options keep the array docopt
+  # itself would produce for them. Falsy defaults ([default: false])
+  # stay absent, like before.
   private def self.extract_docopt_defaults(compiled : Compiled) : Hash(String, OptionValue?)
     defaults = Hash(String, OptionValue?).new
     compiled.defaults.each do |key, value|
-      next unless key.starts_with?("--")
       case value
       when Array(String)
         defaults[key] = value

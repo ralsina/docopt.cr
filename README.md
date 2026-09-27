@@ -216,6 +216,20 @@ candidates)` returns the close matches for any word list (closest
 first, ties alphabetically, at most four, within a distance of
 `max(size // 3, 2)`), defaulting to the registered commands.
 
+Dispatch also composes with the configuration layer:
+`require "docopt/dispatch_config"` adds `Dispatch.config_main`, which
+resolves every command's options through the full precedence chain
+(CLI > environment > config file > docopt defaults) before `run` sees
+them — commands keep reading `options["-p"]` unchanged — and supports
+a per-command `--print-config` flag:
+
+```crystal
+exit(Docopt::Dispatch.config_main("say", ARGV,
+  config_file_path: "~/.config/say/config.yml",
+  env_prefix: "SAY",
+  print_config_option: "--print-config"))
+```
+
 See `examples/dispatch` for a complete tool with completion flags.
 
 ## Shell Completion Generation
