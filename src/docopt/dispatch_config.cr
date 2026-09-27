@@ -73,8 +73,8 @@ module Docopt
 
     # The precedence-resolved values as the plain options hash
     # commands expect, normalized to docopt's own value types.
-    private def self.resolved_options(options : ConfigOptions) : Hash(String, (String | Int32 | Bool | Array(String))?)
-      resolved = Hash(String, (String | Int32 | Bool | Array(String))?).new
+    private def self.resolved_options(options : ConfigOptions) : Result
+      resolved = Result.new
       (options.args.keys + options.docopt_defaults.keys).uniq.each do |key|
         value = options[key]
         case value

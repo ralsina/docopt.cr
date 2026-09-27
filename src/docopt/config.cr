@@ -48,6 +48,8 @@ module Docopt
   end
 
   class ConfigOptions
+    include TypedAccessors
+
     # Values as docopt itself produces them; only defaults and config/env
     # sources can widen to Int64/Float64 (see OptionValue).
     property args : Hash(String, DocoptValue?)

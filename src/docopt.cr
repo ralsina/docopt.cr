@@ -652,7 +652,104 @@ module Docopt
     end
   end
 
-  alias Result = Hash(String, (String | Int32 | Bool | Array(String))?)
+  # Raised when a typed accessor (options.string("--speed") and
+  # friends) is asked for a type the value does not have.
+  class TypeMismatchError < Exception
+  end
+
+  # Typed access over an options hash: instead of .as(String) casts
+  # and their generic failures, ask for the type and get a message
+  # that names the option, the value and its actual type. Included by
+  # Docopt::Result and, through the config layer, by ConfigOptions —
+  # where a value may also be an Int64 or Float64 from a config file.
+  module TypedAccessors
+    def string(key : String) : String
+      value = self[key]?
+      raise TypeMismatchError.new("#{key} was not given") unless value
+      raise mismatch(key, value) unless value.is_a?(String)
+      value
+    end
+
+    def string?(key : String) : String?
+      value = self[key]?
+      return unless value
+      raise mismatch(key, value) unless value.is_a?(String)
+      value
+    end
+
+    def int(key : String) : Int32
+      value = self[key]?
+      raise TypeMismatchError.new("#{key} was not given") unless value
+      raise mismatch(key, value) unless value.is_a?(Int32)
+      value
+    end
+
+    def int?(key : String) : Int32?
+      value = self[key]?
+      return unless value
+      raise mismatch(key, value) unless value.is_a?(Int32)
+      value
+    end
+
+    def bool(key : String) : Bool
+      value = self[key]?
+      raise TypeMismatchError.new("#{key} was not given") if value.nil?
+      raise mismatch(key, value) unless value.is_a?(Bool)
+      value
+    end
+
+    def bool?(key : String) : Bool?
+      value = self[key]?
+      return if value.nil?
+      raise mismatch(key, value) unless value.is_a?(Bool)
+      value
+    end
+
+    def array(key : String) : Array(String)
+      value = self[key]?
+      raise TypeMismatchError.new("#{key} was not given") unless value
+      raise mismatch(key, value) unless value.is_a?(Array(String))
+      value
+    end
+
+    def array?(key : String) : Array(String)?
+      value = self[key]?
+      return unless value
+      raise mismatch(key, value) unless value.is_a?(Array(String))
+      value
+    end
+
+    # Only the config layer can produce floats (from config files);
+    # kept here so every options surface answers the same questions.
+    def float(key : String) : Float64
+      value = self[key]?
+      raise TypeMismatchError.new("#{key} was not given") unless value
+      raise mismatch(key, value) unless value.is_a?(Float64)
+      value
+    end
+
+    def float?(key : String) : Float64?
+      value = self[key]?
+      return unless value
+      raise mismatch(key, value) unless value.is_a?(Float64)
+      value
+    end
+
+    private def mismatch(key : String, value) : TypeMismatchError
+      TypeMismatchError.new("#{key} is #{value} (#{value.class}), not the requested type")
+    end
+  end
+
+  # The result of a successful match: the parsed values, plus typed
+  # accessors from TypedAccessors (options.string("--speed") and
+  # friends) for reading them without .as casts.
+  class Result < Hash(String, (String | Int32 | Bool | Array(String))?)
+    include TypedAccessors
+
+    def initialize
+      super
+    end
+  end
 
   # Parse a docopt usage text into a `Compiled` pattern that can be
   # matched against argument vectors any number of times. This is the
@@ -721,7 +818,7 @@ module Docopt
       end
       return dic
     end
-    raise DocoptExit.new(failure_message(compiled, left))
+    raise DocoptExit.new(failure_message(compiled, left, matched))
   rescue ex
     # The usage to print comes from the pattern being matched, not
     # from the DocoptExit.usage global (kept in sync above for
@@ -788,14 +885,19 @@ module Docopt
   # was, plus a "did you mean" hint when it looks like a typo of a
   # declared option or command. Short tokens are not suggested
   # against: everything is within edit distance of a one-letter flag.
-  private def self.failure_message(compiled : Compiled, left : Array(Pattern)) : String
+  #
+  # A declared option left over when the match *succeeded* up to that
+  # point was given too many times; with a failed match it more likely
+  # belongs to an unsatisfied branch, and the honest message is that
+  # the arguments do not match the usage at all.
+  private def self.failure_message(compiled : Compiled, left : Array(Pattern), matched : Bool) : String
     return "" if left.empty?
     offender = left.first
     case offender
     when Option
       name = offender.name.to_s
       if compiled.options.any? { |option| option.name == name }
-        "Option #{name} given too many times"
+        matched ? "Option #{name} given too many times" : "Arguments do not match the usage"
       else
         base = "Unknown option #{name}"
         return base if name.size < 3

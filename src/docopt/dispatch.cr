@@ -25,7 +25,7 @@ module Docopt
     # The name "help" is reserved.
 
     abstract struct Command
-      property options : Hash(String, (String | Int32 | Bool | Array(String))?)
+      property options : Result
       class_property name : String = "command"
       class_property doc : String = ""
 

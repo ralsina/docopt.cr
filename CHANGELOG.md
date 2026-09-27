@@ -1,10 +1,14 @@
 # Changelog
 
 All notable changes to this project are documented in this file.
-## Unreleased
+## 1.1.0 - 2026-09-27
+
+### Features
+- Feat: error messages that name the problem and suggest the fix
 
 ### Miscellaneous
 - Docs: read the README end to end and fix what grew stale
+- Style: annotate Dispatch.main's complexity
 
 ## 1.0.0 - 2026-09-27
 

@@ -95,6 +95,25 @@ The matcher behind the hints is public and domain independent:
 matches (closest first, ties alphabetically, at most four, within a
 distance of `max(size // 3, 2)`).
 
+## Typed Access
+
+Instead of `.as(String)` casts and their generic failures, ask the
+result for the type you want; a wrong ask raises a `TypeMismatchError`
+naming the option, the value and its actual type.
+
+```crystal
+options = Docopt.docopt(doc, ARGV)
+speed = options.string("--speed")
+count = options.int("-v")              # counting flags are integers
+names = options.array("<name>")
+shout = options.bool("--shout")
+quiet = options.string?("--output")    # nil when not given
+```
+
+The same questions work on `ConfigOptions` from the configuration
+layer (after precedence) and on a dispatch command's `options`. Note
+that counting flags (`-vv`) are `Int32`, not `Bool`.
+
 ## Compile-time parsing
 
 `Docopt.docopt` parses the usage text on every run, which for a
