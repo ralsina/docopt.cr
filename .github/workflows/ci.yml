@@ -21,6 +21,9 @@ jobs:
       - name: Run specs
         run: crystal spec
       - name: Run -Dcolor_docopt specs
+        # current tartrazine needs a recent Crystal; docopt's own
+        # minimum is tested by the regular spec run above
+        if: matrix.crystal == 'latest'
         run: crystal spec -Dcolor_docopt spec/color_flag_spec.cr
 
   lint:
