@@ -165,9 +165,15 @@ module Docopt
       message
     end
 
-    private def self.suggestions_for(attempted : String) : Array(String)
+    # Candidates close to *attempted*, closest first: every candidate
+    # within a case-insensitive Levenshtein distance of
+    # `max(attempted.size // 3, 2)`, at most four, ties broken
+    # alphabetically. Defaults to the registered command names; pass
+    # any word list to reuse it for option names, config keys and the
+    # like.
+    def self.suggestions_for(attempted : String, candidates : Array(String) = COMMANDS.keys) : Array(String)
       max_distance = {attempted.size // 3, 2}.max
-      COMMANDS.keys
+      candidates
         .select { |candidate| levenshtein_distance(candidate, attempted) <= max_distance }
         .sort_by! { |candidate| {levenshtein_distance(candidate, attempted), candidate} }
         .first(4)

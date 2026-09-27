@@ -97,6 +97,30 @@ describe Docopt::Dispatch do
     end
   end
 
+  describe ".suggestions_for" do
+    it "suggests close registered commands" do
+      Docopt::Dispatch.suggestions_for("failr").should eq(["fail"])
+    end
+
+    it "breaks distance ties alphabetically" do
+      Docopt::Dispatch.suggestions_for("gret").should eq(["great", "greet"])
+    end
+
+    it "suggests nothing when nothing is close enough" do
+      Docopt::Dispatch.suggestions_for("zzzzzzzzzz").should eq([] of String)
+    end
+
+    it "works on any candidate list" do
+      options = ["--verbose", "--version", "--force"]
+      Docopt::Dispatch.suggestions_for("--verbos", options).should eq(["--verbose"])
+    end
+
+    it "caps the list at four suggestions" do
+      candidates = ["aa", "ab", "ac", "ad", "ae", "af"]
+      Docopt::Dispatch.suggestions_for("ag", candidates).should eq(["aa", "ab", "ac", "ad"])
+    end
+  end
+
   describe ".main" do
     it "runs a registered command and returns its exit code" do
       code, _stdout, stderr = run_main(["greet", "-p", "mars"])

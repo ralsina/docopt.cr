@@ -211,6 +211,11 @@ puts Docopt::Dispatch.fish_completion("say", {"say_hello" => "world mars"})
 puts Docopt::Dispatch.zsh_completion("say")
 ```
 
+The typo machinery is reusable: `Dispatch.suggestions_for(attempted,
+candidates)` returns the close matches for any word list (closest
+first, ties alphabetically, at most four, within a distance of
+`max(size // 3, 2)`), defaulting to the registered commands.
+
 See `examples/dispatch` for a complete tool with completion flags.
 
 ## Shell Completion Generation
