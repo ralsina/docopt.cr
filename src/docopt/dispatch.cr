@@ -61,6 +61,10 @@ module Docopt
     # Main entry point. Call this with the program name and ARGV.
     # Returns the exit code of the executed command, so a typical
     # program ends with: `exit(Docopt::Dispatch.main("prog", ARGV))`
+    #
+    # One linear dispatch flow: top-level help, the help command,
+    # command lookup, help flags, parse, run.
+    # ameba:disable Metrics/CyclomaticComplexity
     def self.main(progname : String, args : Array(String), stdout : IO = STDOUT, stderr : IO = STDERR) : Int32
       return print_top_level_help(progname, stdout) if args.empty? || args[0] == "-h" || args[0] == "--help"
       return help_command(progname, args, stdout, stderr) if args[0] == "help"
