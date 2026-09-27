@@ -430,13 +430,12 @@ text and usage-in-errors — only on terminals, and only when
 `NO_COLOR` (https://no-color.org) is unset. `Docopt.colorize(text,
 io)` applies the same gating to your own output.
 
-For tartrazine-grade coloring, docopt.cr ships an integration that
-uses tartrazine's own docopt lexer, in-process (add tartrazine to
-your dependencies):
+For tartrazine-grade coloring, tartrazine itself ships the
+integration — its docopt lexer highlights the help, in-process:
 
 ```crystal
 require "docopt"
-require "docopt/color"
+require "tartrazine/docopt_color"   # from the tartrazine shard
 
 Docopt.use_tartrazine_color            # or use_tartrazine_color("gruvbox-dark")
 options = Docopt.docopt(doc, ARGV)
