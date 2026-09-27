@@ -1,6 +1,16 @@
 # Changelog
 
 All notable changes to this project are documented in this file.
+## Unreleased
+
+### Miscellaneous
+- Docs: read the README end to end and fix what grew stale
+
+## 1.0.0 - 2026-09-27
+
+### Miscellaneous
+- Docs: badges, changelog and a README that tells the whole story
+
 ## 0.9.0 - 2026-09-27
 
 ### Features

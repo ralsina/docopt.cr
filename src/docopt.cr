@@ -721,7 +721,7 @@ module Docopt
       end
       return dic
     end
-    raise DocoptExit.new
+    raise DocoptExit.new(failure_message(compiled, left))
   rescue ex
     # The usage to print comes from the pattern being matched, not
     # from the DocoptExit.usage global (kept in sync above for
@@ -744,6 +744,74 @@ module Docopt
     end
     puts usage if usage && !usage.empty?
     Process.exit
+  end
+
+  # Candidates close to *attempted*, closest first: every candidate
+  # within a case-insensitive Levenshtein distance of
+  # `max(attempted.size // 3, 2)`, at most four, ties broken
+  # alphabetically. The machinery behind "did you mean" hints, usable
+  # for any word list.
+  def self.suggestions_for(attempted : String, candidates : Array(String) = [] of String) : Array(String)
+    max_distance = {attempted.size // 3, 2}.max
+    candidates
+      .select { |candidate| levenshtein_distance(candidate, attempted) <= max_distance }
+      .sort_by! { |candidate| {levenshtein_distance(candidate, attempted), candidate} }
+      .first(4)
+  end
+
+  # Case-insensitive Levenshtein edit distance between two strings
+  def self.levenshtein_distance(left : String, right : String) : Int32
+    left_chars = left.downcase.chars
+    right_chars = right.downcase.chars
+    return right_chars.size if left_chars.empty?
+    return left_chars.size if right_chars.empty?
+
+    previous_row = (0..right_chars.size).to_a
+
+    left_chars.each_with_index(1) do |left_char, row|
+      current_row = [row]
+      right_chars.each_with_index do |right_char, column|
+        substitution_cost = left_char == right_char ? 0 : 1
+        current_row << {
+          previous_row[column + 1] + 1,
+          current_row[column] + 1,
+          previous_row[column] + substitution_cost,
+        }.min
+      end
+      previous_row = current_row
+    end
+
+    previous_row.last
+  end
+
+  # The message for a failed match: what the first unmatched token
+  # was, plus a "did you mean" hint when it looks like a typo of a
+  # declared option or command. Short tokens are not suggested
+  # against: everything is within edit distance of a one-letter flag.
+  private def self.failure_message(compiled : Compiled, left : Array(Pattern)) : String
+    return "" if left.empty?
+    offender = left.first
+    case offender
+    when Option
+      name = offender.name.to_s
+      if compiled.options.any? { |option| option.name == name }
+        "Option #{name} given too many times"
+      else
+        base = "Unknown option #{name}"
+        return base if name.size < 3
+        candidates = compiled.options.map(&.name.to_s).uniq!
+        suggestions = suggestions_for(name, candidates)
+        suggestions.empty? ? base : "#{base}. Did you mean #{suggestions.join(" or ")}?"
+      end
+    when Argument
+      value = offender.value.to_s
+      base = "Unexpected argument '#{value}'"
+      commands = compiled.pattern.flat(Command).map { |command| command.as(Command).name.to_s }.uniq!
+      suggestions = suggestions_for(value, commands)
+      suggestions.empty? ? base : "#{base}. Did you mean '#{suggestions.join("' or '")}'?"
+    else
+      ""
+    end
   end
 
   # Parse a docopt usage text at compile time.

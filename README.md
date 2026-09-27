@@ -75,6 +75,26 @@ elements as arrays and counting flags as integers; unmatched argv
 prints the usage and exits (or raises `Docopt::DocoptExit` with
 `exit: false`).
 
+## Error Messages
+
+Failed matches explain what went wrong instead of only dumping the
+usage: unknown options and unexpected arguments are named, and close
+typos get a "did you mean" hint computed against the declared options
+and commands.
+
+```
+$ prog --verbso
+Unknown option --verbso. Did you mean --verbose?
+Usage:
+  prog [--verbose] [--version]
+  ...
+```
+
+The matcher behind the hints is public and domain independent:
+`Docopt.suggestions_for(attempted, candidates)` returns the close
+matches (closest first, ties alphabetically, at most four, within a
+distance of `max(size // 3, 2)`).
+
 ## Compile-time parsing
 
 `Docopt.docopt` parses the usage text on every run, which for a

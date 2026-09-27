@@ -79,7 +79,9 @@ module Docopt
       rescue error : Docopt::DocoptLanguageError
         stderr.puts "Invalid documentation for command '#{command_name}': #{error.message}"
         return 1
-      rescue Docopt::DocoptExit
+      rescue error : Docopt::DocoptExit
+        message = error.message
+        stderr.puts message if message && !message.empty?
         stderr.puts command.compiled.usage
         stderr.puts
         stderr.puts "See '#{progname} help #{command_name}' for more information."
@@ -168,15 +170,11 @@ module Docopt
     # Candidates close to *attempted*, closest first: every candidate
     # within a case-insensitive Levenshtein distance of
     # `max(attempted.size // 3, 2)`, at most four, ties broken
-    # alphabetically. Defaults to the registered command names; pass
-    # any word list to reuse it for option names, config keys and the
-    # like.
+    # alphabetically. Defaults to the registered command names; the
+    # implementation lives in the core (Docopt.suggestions_for) and
+    # powers its "did you mean" error messages too.
     def self.suggestions_for(attempted : String, candidates : Array(String) = COMMANDS.keys) : Array(String)
-      max_distance = {attempted.size // 3, 2}.max
-      candidates
-        .select { |candidate| levenshtein_distance(candidate, attempted) <= max_distance }
-        .sort_by! { |candidate| {levenshtein_distance(candidate, attempted), candidate} }
-        .first(4)
+      Docopt.suggestions_for(attempted, candidates)
     end
 
     # One completion tree covering every registered command: the root
@@ -214,29 +212,10 @@ module Docopt
       Docopt.zsh_completion(cmd, param_tree, option_help, custom_completions)
     end
 
-    # Case-insensitive Levenshtein edit distance between two strings
+    # Case-insensitive Levenshtein edit distance; see
+    # Docopt.levenshtein_distance in the core.
     def self.levenshtein_distance(left : String, right : String) : Int32
-      left_chars = left.downcase.chars
-      right_chars = right.downcase.chars
-      return right_chars.size if left_chars.empty?
-      return left_chars.size if right_chars.empty?
-
-      previous_row = (0..right_chars.size).to_a
-
-      left_chars.each_with_index(1) do |left_char, row|
-        current_row = [row]
-        right_chars.each_with_index do |right_char, column|
-          substitution_cost = left_char == right_char ? 0 : 1
-          current_row << {
-            previous_row[column + 1] + 1,
-            current_row[column] + 1,
-            previous_row[column] + substitution_cost,
-          }.min
-        end
-        previous_row = current_row
-      end
-
-      previous_row.last
+      Docopt.levenshtein_distance(left, right)
     end
   end
 end
