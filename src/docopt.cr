@@ -844,7 +844,7 @@ module Docopt
   def self.colorize(text : String, io : IO) : String
     colorizer = @@colorizer
     return text unless colorizer
-    return text unless io.tty? && !ENV.has_key?("NO_COLOR")
+    return text if !io.tty? || ENV.has_key?("NO_COLOR")
     colorizer.call(text)
   end
 
