@@ -1,15 +1,26 @@
 # docopt.cr
 
-docopt for crystal-lang
+[![CI](https://github.com/ralsina/docopt.cr/actions/workflows/ci.yml/badge.svg)](https://github.com/ralsina/docopt.cr/actions/workflows/ci.yml)
+[![GitHub tag](https://img.shields.io/github/v/tag/ralsina/docopt.cr)](https://github.com/ralsina/docopt.cr/tags)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-This is a fork of the original [docopt.cr by chenkovsky](https://github.com/chenkovsky/docopt.cr) with a few bugfixes.
+docopt for crystal-lang: command-line interfaces declared as help
+text, with everything that grows on top of them.
 
+A fork of the original [docopt.cr by chenkovsky](https://github.com/chenkovsky/docopt.cr),
+conformant with the official docopt test suite, that grew:
 
-It has a couple of bugfixes and I am now starting to add new features:
+* compile-time parsing (`Docopt.compile`, `Docopt.compile_config`)
+* working bash, fish and zsh completion generation, including
+  subcommand-aware completion for dispatch tools
+* the configuration layer (`require "docopt/config"`): YAML config
+  files and environment variables under CLI precedence
+* subcommand dispatch (`require "docopt/dispatch"`): git-style
+  command trees with help, typo suggestions and exit codes
+* both together (`require "docopt/dispatch_config"`): every
+  command's options resolved through the full precedence chain
 
-* bash completion generation
-* fish completion generation
-* zsh completion generation
+See the [changelog](CHANGELOG.md) for release history.
 * Custom hooks for smarter completion
 
 
