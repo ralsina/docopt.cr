@@ -1,6 +1,24 @@
 # Changelog
 
 All notable changes to this project are documented in this file.
+## Unreleased
+
+### Miscellaneous
+- Docs: point colored-help users at the -Dnolexers + TT_LEXERS=docopt recipe
+
+## 1.4.1 - 2026-09-27
+
+### Bug Fixes
+- Fix: host the tartrazine colorizer in tartrazine, not here
+
+## 1.4.0 - 2026-09-27
+
+### Features
+- Feat: colored help through a colorizer hook, with tartrazine integration
+
+### Miscellaneous
+- Style: positive conditions in the colorize gate
+
 ## 1.3.0 - 2026-09-27
 
 ### Features

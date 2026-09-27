@@ -1,5 +1,5 @@
 name: docopt
-version: 1.4.1
+version: 1.5.0
 
 authors:
   - chenkovsky.chen <chenkov@yeah.net>
@@ -18,3 +18,7 @@ targets:
 development_dependencies:
   ameba:
     github: crystal-ameba/ameba
+  # Only for the -Dcolor_docopt spec; applications opt in with their
+  # own dependency
+  tartrazine:
+    github: ralsina/tartrazine

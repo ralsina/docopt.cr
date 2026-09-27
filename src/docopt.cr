@@ -841,10 +841,16 @@ module Docopt
   # Text with the colorizer applied, when coloring applies to *io*:
   # a terminal output and no NO_COLOR. Usable for your own output to
   # keep the same gating as docopt's.
+  #
+  # With -Dcolor_docopt (and tartrazine among your dependencies), an
+  # unset colorizer falls back to tartrazine's docopt lexer, so
+  # colored help needs no code at all.
   def self.colorize(text : String, io : IO) : String
     colorizer = @@colorizer
-    return text unless colorizer
-    return text if !io.tty? || ENV.has_key?("NO_COLOR")
+    {% if flag?(:color_docopt) %}
+      colorizer = tartrazine_colorizer if colorizer.nil?
+    {% end %}
+    return text if colorizer.nil? || !io.tty? || ENV.has_key?("NO_COLOR")
     colorizer.call(text)
   end
 
@@ -962,3 +968,38 @@ require "./bash_completion"
 require "./fish_completion"
 require "./zsh_completion"
 require "./docopt/man"
+
+# -Dcolor_docopt links tartrazine (which must be among the
+# application's dependencies) and makes an unset colorizer fall back
+# to tartrazine's docopt lexer, so colored help is zero-code:
+#
+#     shards install   # with tartrazine in shard.yml
+#     crystal build -Dcolor_docopt src/app.cr
+#
+# Without -Dnolexers this links every tartrazine lexer, which the
+# compile-time note below points out; TT_LEXERS=docopt -Dnolexers
+# bakes just the one needed here.
+{% if flag?(:color_docopt) %}
+  require "tartrazine"
+
+  {% if !flag?(:nolexers) %}
+    {% puts "docopt: -Dcolor_docopt links all of tartrazine lexers; build with -Dnolexers and TT_LEXERS=docopt to bake only the docopt lexer" %}
+  {% end %}
+
+  module Docopt
+    @@tartrazine_colorizer : Proc(String, String)?
+
+    # The -Dcolor_docopt fallback: tartrazine's docopt lexer through
+    # its terminal formatter, default-dark, built once.
+    private def self.tartrazine_colorizer : Proc(String, String)
+      if (wired = @@tartrazine_colorizer)
+        wired
+      else
+        lexer = Tartrazine.lexer(name: "docopt")
+        formatter = Tartrazine::Ansi.new
+        formatter.theme = Tartrazine.theme("default-dark")
+        @@tartrazine_colorizer = ->(text : String) { formatter.format(text, lexer) }
+      end
+    end
+  end
+{% end %}

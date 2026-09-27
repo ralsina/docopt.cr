@@ -430,8 +430,14 @@ text and usage-in-errors — only on terminals, and only when
 `NO_COLOR` (https://no-color.org) is unset. `Docopt.colorize(text,
 io)` applies the same gating to your own output.
 
-For tartrazine-grade coloring, tartrazine itself ships the
-integration — its docopt lexer highlights the help, in-process:
+Two levels of tartrazine integration are available, both in-process:
+
+Add tartrazine to your dependencies and build with
+`-Dcolor_docopt`: colored help with no code at all (a compile-time
+note points out that this links every tartrazine lexer; build with
+`-Dnolexers` and `TT_LEXERS=docopt` to bake just the docopt one).
+
+Or require tartrazine's bridge explicitly, for theme control:
 
 ```crystal
 require "docopt"

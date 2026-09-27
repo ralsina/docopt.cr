@@ -20,6 +20,8 @@ jobs:
         run: shards build
       - name: Run specs
         run: crystal spec
+      - name: Run -Dcolor_docopt specs
+        run: crystal spec -Dcolor_docopt spec/color_flag_spec.cr
 
   lint:
     runs-on: ubuntu-latest
